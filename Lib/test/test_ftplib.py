@@ -207,6 +207,11 @@ class DummyFTPHandler(asynchat.async_chat):
                 self.dtp.close_when_done()
                 self.rest = None
 
+            case 'setlongretr', argument:
+                # For testing. Next RETR will return long line.
+                self.next_retr_data = 'x' * int(argument)
+                self.push('125 setlongretr ok')
+
             case 'size', _:
                 self.push('250 1000')
 
@@ -248,11 +253,6 @@ class DummyFTPHandler(asynchat.async_chat):
 
     def push(self, data):
         asynchat.async_chat.push(self, data.encode(self.encoding) + b'\r\n')
-
-    def cmd_setlongretr(self, arg):
-        # For testing. Next RETR will return long line.
-        self.next_retr_data = 'x' * int(arg)
-        self.push('125 setlongretr ok')
 
 
 class DummyFTPServer(asyncore.dispatcher):
