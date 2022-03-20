@@ -177,6 +177,10 @@ class DummyFTPHandler(asynchat.async_chat):
                 self.dtp = self.dtp_handler(s, baseclass=self)
                 self.push('200 active data connection established')
 
+            case 'quit':
+                self.push('221 quit ok')
+                self.close()
+
             case 'size', _:
                 self.push('250 1000')
 
@@ -218,10 +222,6 @@ class DummyFTPHandler(asynchat.async_chat):
 
     def push(self, data):
         asynchat.async_chat.push(self, data.encode(self.encoding) + b'\r\n')
-
-    def cmd_quit(self, arg):
-        self.push('221 quit ok')
-        self.close()
 
     def cmd_rest(self, arg):
         self.rest = arg
