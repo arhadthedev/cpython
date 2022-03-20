@@ -144,6 +144,9 @@ class DummyFTPHandler(asynchat.async_chat):
             case 'pass' | 'acct' as command, _:
                 self.push(f'230 {command} ok')
             
+            case 'cwd' | 'dele' | 'rmd' | 'rnto' as command, _:
+                self.push(f'250 {command} ok')
+
             case 'user', _:
                 self.push('331 user ok')
 
@@ -201,23 +204,11 @@ class DummyFTPHandler(asynchat.async_chat):
         # sends back the received string (used by the test suite)
         self.push(arg)
 
-    def cmd_rnto(self, arg):
-        self.push('250 rnto ok')
-
-    def cmd_dele(self, arg):
-        self.push('250 dele ok')
-
-    def cmd_cwd(self, arg):
-        self.push('250 cwd ok')
-
     def cmd_size(self, arg):
         self.push('250 1000')
 
     def cmd_mkd(self, arg):
         self.push('257 "%s"' %arg)
-
-    def cmd_rmd(self, arg):
-        self.push('250 rmd ok')
 
     def cmd_pwd(self, arg):
         self.push('257 "pwd ok"')
