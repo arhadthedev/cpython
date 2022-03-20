@@ -164,6 +164,11 @@ class DummyFTPHandler(asynchat.async_chat):
             case 'mkd', argument:
                 self.push(f'257 "{argument}"')
 
+            case 'nlst':
+                self.push('125 nlst ok')
+                self.dtp.push(NLST_DATA)
+                self.dtp.close_when_done()
+
             case 'pasv', _:
                 with socket.create_server((self.socket.getsockname()[0], 0)) as sock:
                     sock.settimeout(TIMEOUT)
@@ -238,11 +243,6 @@ class DummyFTPHandler(asynchat.async_chat):
 
     def push(self, data):
         asynchat.async_chat.push(self, data.encode(self.encoding) + b'\r\n')
-
-    def cmd_nlst(self, arg):
-        self.push('125 nlst ok')
-        self.dtp.push(NLST_DATA)
-        self.dtp.close_when_done()
 
     def cmd_mlsd(self, arg):
         self.push('125 mlsd ok')
