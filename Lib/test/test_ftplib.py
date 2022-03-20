@@ -144,6 +144,15 @@ class DummyFTPHandler(asynchat.async_chat):
                 self.dtp = self.dtp_handler(s, baseclass=self)
                 self.push('200 active data connection established')
 
+            case 'epsv':
+                with socket.create_server((self.socket.getsockname()[0], 0),
+                                          family=socket.AF_INET6) as sock:
+                    sock.settimeout(TIMEOUT)
+                    port = sock.getsockname()[1]
+                    self.push(f'229 entering extended passive mode (|||{port}|)')
+                    conn = sock.accept()[0]
+                    self.dtp = self.dtp_handler(conn, baseclass=self)
+
             case 'pasv', _:
                 with socket.create_server((self.socket.getsockname()[0], 0)) as sock:
                     sock.settimeout(TIMEOUT)
@@ -200,15 +209,6 @@ class DummyFTPHandler(asynchat.async_chat):
 
     def push(self, data):
         asynchat.async_chat.push(self, data.encode(self.encoding) + b'\r\n')
-
-    def cmd_epsv(self, arg):
-        with socket.create_server((self.socket.getsockname()[0], 0),
-                                  family=socket.AF_INET6) as sock:
-            sock.settimeout(TIMEOUT)
-            port = sock.getsockname()[1]
-            self.push('229 entering extended passive mode (|||%d|)' %port)
-            conn, addr = sock.accept()
-            self.dtp = self.dtp_handler(conn, baseclass=self)
 
     def cmd_echo(self, arg):
         # sends back the received string (used by the test suite)
