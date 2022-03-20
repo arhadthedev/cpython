@@ -465,20 +465,20 @@ if ssl is not None:
                     # Any other value is accepted but ignored.
                     self.push('200 PBSZ=0 successful')
 
+                case 'prot', argument:
+                    # Setup un/secure data channel.
+                    match argument.upper():
+                        case 'C':
+                            self.push('200 Protection set to Clear')
+                            self.secure_data_channel = False
+                        case 'P':
+                            self.push('200 Protection set to Private')
+                            self.secure_data_channel = True
+                        case _:
+                            self.push('502 Unrecognized PROT type (use C or P)')
+
                 case _:
                     super(DummyFTPHandler, self).process_command(parsed)
-
-        def cmd_prot(self, line):
-            """Setup un/secure data channel."""
-            arg = line.upper()
-            if arg == 'C':
-                self.push('200 Protection set to Clear')
-                self.secure_data_channel = False
-            elif arg == 'P':
-                self.push('200 Protection set to Private')
-                self.secure_data_channel = True
-            else:
-                self.push("502 Unrecognized PROT type (use C or P).")
 
 
     class DummyTLS_FTPServer(DummyFTPServer):
