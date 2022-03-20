@@ -147,6 +147,9 @@ class DummyFTPHandler(asynchat.async_chat):
             case 'cwd' | 'dele' | 'rmd' | 'rnto' as command, _:
                 self.push(f'250 {command} ok')
 
+            case 'pwd':
+                self.push('257 pwd ok')
+
             case 'user', _:
                 self.push('331 user ok')
 
@@ -209,9 +212,6 @@ class DummyFTPHandler(asynchat.async_chat):
 
     def cmd_mkd(self, arg):
         self.push('257 "%s"' %arg)
-
-    def cmd_pwd(self, arg):
-        self.push('257 "pwd ok"')
 
     def cmd_quit(self, arg):
         self.push('221 quit ok')
