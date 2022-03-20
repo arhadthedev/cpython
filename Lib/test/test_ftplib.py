@@ -138,6 +138,16 @@ class DummyFTPHandler(asynchat.async_chat):
     # May be overriden in a derived class to add more commands
     def process_command(self, parsed):
         match parsed:
+            case 'pasv', _:
+                with socket.create_server((self.socket.getsockname()[0], 0)) as sock:
+                    sock.settimeout(TIMEOUT)
+                    port = sock.getsockname()[1]
+                    ip = self.fake_pasv_server_ip.replace('.', ',')
+                    p1, p2 = port / 256, port % 256
+                    self.push(f'227 entering passive mode ({ip},{p1},{p2})')
+                    conn = sock.accept()[0]
+                    self.dtp = self.dtp_handler(conn, baseclass=self)
+
             case 'port', argument:
                 address = argument.split(',')
                 ip = '.'.join(address[:4])
@@ -184,16 +194,6 @@ class DummyFTPHandler(asynchat.async_chat):
 
     def push(self, data):
         asynchat.async_chat.push(self, data.encode(self.encoding) + b'\r\n')
-
-    def cmd_pasv(self, arg):
-        with socket.create_server((self.socket.getsockname()[0], 0)) as sock:
-            sock.settimeout(TIMEOUT)
-            port = sock.getsockname()[1]
-            ip = self.fake_pasv_server_ip
-            ip = ip.replace('.', ','); p1 = port / 256; p2 = port % 256
-            self.push('227 entering passive mode (%s,%d,%d)' %(ip, p1, p2))
-            conn, addr = sock.accept()
-            self.dtp = self.dtp_handler(conn, baseclass=self)
 
     def cmd_eprt(self, arg):
         af, ip, port = arg.split(arg[0])[1:-1]
