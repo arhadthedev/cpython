@@ -141,6 +141,9 @@ class DummyFTPHandler(asynchat.async_chat):
             case 'noop' | 'opts' | 'type' as command, *_:
                 self.push(f'200 {command} ok')
 
+            case 'pass' | 'acct' as command, _:
+                self.push(f'230 {command} ok')
+            
             case 'user', _:
                 self.push('331 user ok')
 
@@ -194,12 +197,6 @@ class DummyFTPHandler(asynchat.async_chat):
     def cmd_echo(self, arg):
         # sends back the received string (used by the test suite)
         self.push(arg)
-
-    def cmd_pass(self, arg):
-        self.push('230 password ok')
-
-    def cmd_acct(self, arg):
-        self.push('230 acct ok')
 
     def cmd_rnfr(self, arg):
         self.push('350 rnfr ok')
