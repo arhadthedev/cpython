@@ -138,6 +138,16 @@ class DummyFTPHandler(asynchat.async_chat):
     # May be overriden in a derived class to add more commands
     def process_command(self, parsed):
         match parsed:
+            case 'port', argument:
+                address = argument.split(',')
+                ip = '.'.join(address[:4])
+                port = int(address[4]) * 256 + int(address[5])
+                s = socket.create_connection((ip, port), timeout=TIMEOUT)
+                self.dtp = self.dtp_handler(s, baseclass=self)
+                self.push('200 active data connection established')
+
+            # Dummy commands
+
             case 'stor', _:
                 self.push('125 stor ok')
 
@@ -174,14 +184,6 @@ class DummyFTPHandler(asynchat.async_chat):
 
     def push(self, data):
         asynchat.async_chat.push(self, data.encode(self.encoding) + b'\r\n')
-
-    def cmd_port(self, arg):
-        addr = list(map(int, arg.split(',')))
-        ip = '%d.%d.%d.%d' %tuple(addr[:4])
-        port = (addr[4] * 256) + addr[5]
-        s = socket.create_connection((ip, port), timeout=TIMEOUT)
-        self.dtp = self.dtp_handler(s, baseclass=self)
-        self.push('200 active data connection established')
 
     def cmd_pasv(self, arg):
         with socket.create_server((self.socket.getsockname()[0], 0)) as sock:
