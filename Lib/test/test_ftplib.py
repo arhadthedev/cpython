@@ -274,22 +274,47 @@ class DummyFTPHandler(asynchat.async_chat):
         self.push('125 setlongretr ok')
 
 
-class DummyFTPServer(asyncore.dispatcher, threading.Thread):
+class DummyFTPServer(asyncore.dispatcher):
 
     handler = DummyFTPHandler
 
     def __init__(self, address, af=socket.AF_INET, encoding=DEFAULT_ENCODING):
-        threading.Thread.__init__(self)
         asyncore.dispatcher.__init__(self)
-        self.daemon = True
         self.create_socket(af, socket.SOCK_STREAM)
         self.bind(address)
         self.listen(5)
-        self.active = False
-        self.active_lock = threading.Lock()
         self.host, self.port = self.socket.getsockname()[:2]
         self.handler_instance = None
         self.encoding = encoding
+
+    def handle_accepted(self, conn, addr):
+        self.handler_instance = self.handler(conn, encoding=self.encoding)
+
+    def handle_connect(self):
+        self.close()
+    handle_read = handle_connect
+
+    def writable(self):
+        return 0
+
+    def handle_error(self):
+        default_error_handler()
+
+
+class ServerThread(threading.Thread):
+    def __init__(self, server):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self.active = False
+        self.active_lock = threading.Lock()
+        self.server = server
+
+        self.host, self.port = server.host, server.port
+        self.encoding = server.encoding
+
+    @property
+    def handler_instance(self):
+        return self.server.handler_instance
 
     def start(self):
         assert not self.active
@@ -310,19 +335,6 @@ class DummyFTPServer(asyncore.dispatcher, threading.Thread):
         assert self.active
         self.active = False
         self.join()
-
-    def handle_accepted(self, conn, addr):
-        self.handler_instance = self.handler(conn, encoding=self.encoding)
-
-    def handle_connect(self):
-        self.close()
-    handle_read = handle_connect
-
-    def writable(self):
-        return 0
-
-    def handle_error(self):
-        default_error_handler()
 
 
 if ssl is not None:
@@ -491,7 +503,7 @@ if ssl is not None:
 class TestFTPClass(TestCase):
 
     def setUp(self, encoding=DEFAULT_ENCODING):
-        self.server = DummyFTPServer((HOST, 0), encoding=encoding)
+        self.server = ServerThread(DummyFTPServer((HOST, 0), encoding=encoding))
         self.server.start()
         self.client = ftplib.FTP(timeout=TIMEOUT, encoding=encoding)
         self.client.connect(self.server.host, self.server.port)
@@ -861,9 +873,9 @@ class TestFTPClass(TestCase):
 class TestIPv6Environment(TestCase):
 
     def setUp(self):
-        self.server = DummyFTPServer((HOSTv6, 0),
-                                     af=socket.AF_INET6,
-                                     encoding=DEFAULT_ENCODING)
+        self.server = ServerThread(DummyFTPServer((HOSTv6, 0),
+                                                  af=socket.AF_INET6,
+                                                  encoding=DEFAULT_ENCODING))
         self.server.start()
         self.client = ftplib.FTP(timeout=TIMEOUT, encoding=DEFAULT_ENCODING)
         self.client.connect(self.server.host, self.server.port)
@@ -910,7 +922,7 @@ class TestTLS_FTPClassMixin(TestFTPClass):
     """
 
     def setUp(self, encoding=DEFAULT_ENCODING):
-        self.server = DummyTLS_FTPServer((HOST, 0), encoding=encoding)
+        self.server = ServerThread(DummyTLS_FTPServer((HOST, 0), encoding=encoding))
         self.server.start()
         self.client = ftplib.FTP_TLS(timeout=TIMEOUT, encoding=encoding)
         self.client.connect(self.server.host, self.server.port)
@@ -924,7 +936,7 @@ class TestTLS_FTPClass(TestCase):
     """Specific TLS_FTP class tests."""
 
     def setUp(self, encoding=DEFAULT_ENCODING):
-        self.server = DummyTLS_FTPServer((HOST, 0), encoding=encoding)
+        self.server = ServerThread(DummyTLS_FTPServer((HOST, 0), encoding=encoding))
         self.server.start()
         self.client = ftplib.FTP_TLS(timeout=TIMEOUT)
         self.client.connect(self.server.host, self.server.port)
