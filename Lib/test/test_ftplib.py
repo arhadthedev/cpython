@@ -156,6 +156,11 @@ class DummyFTPHandler(asynchat.async_chat):
                     conn = sock.accept()[0]
                     self.dtp = self.dtp_handler(conn, baseclass=self)
 
+            case 'list', *_:
+                self.push('125 list ok')
+                self.dtp.push(LIST_DATA)
+                self.dtp.close_when_done()
+
             case 'mkd', argument:
                 self.push(f'257 "{argument}"')
 
@@ -233,11 +238,6 @@ class DummyFTPHandler(asynchat.async_chat):
 
     def push(self, data):
         asynchat.async_chat.push(self, data.encode(self.encoding) + b'\r\n')
-
-    def cmd_list(self, arg):
-        self.push('125 list ok')
-        self.dtp.push(LIST_DATA)
-        self.dtp.close_when_done()
 
     def cmd_nlst(self, arg):
         self.push('125 nlst ok')
