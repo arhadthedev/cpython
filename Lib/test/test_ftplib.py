@@ -147,6 +147,9 @@ class DummyFTPHandler(asynchat.async_chat):
             case 'user', _:
                 self.push('331 user ok')
 
+            case 'rnfr', _:
+                self.push('350 rnfr ok')
+
             case cmd, *rest:
                 if hasattr(self, 'cmd_' + cmd):
                     method = getattr(self, 'cmd_' + cmd)
@@ -197,9 +200,6 @@ class DummyFTPHandler(asynchat.async_chat):
     def cmd_echo(self, arg):
         # sends back the received string (used by the test suite)
         self.push(arg)
-
-    def cmd_rnfr(self, arg):
-        self.push('350 rnfr ok')
 
     def cmd_rnto(self, arg):
         self.push('250 rnto ok')
