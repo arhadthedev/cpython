@@ -174,6 +174,9 @@ class DummyFTPHandler(asynchat.async_chat):
                 self.dtp = self.dtp_handler(s, baseclass=self)
                 self.push('200 active data connection established')
 
+            case 'size', _:
+                self.push('250 1000')
+
             # Dummy commands
 
             case 'stor', _:
@@ -212,9 +215,6 @@ class DummyFTPHandler(asynchat.async_chat):
 
     def push(self, data):
         asynchat.async_chat.push(self, data.encode(self.encoding) + b'\r\n')
-
-    def cmd_size(self, arg):
-        self.push('250 1000')
 
     def cmd_mkd(self, arg):
         self.push('257 "%s"' %arg)
