@@ -138,6 +138,9 @@ class DummyFTPHandler(asynchat.async_chat):
     # May be overriden in a derived class to add more commands
     def process_command(self, parsed):
         match parsed:
+            case 'stor', _:
+                self.push('125 stor ok')
+
             case 'noop' | 'opts' | 'type' as command, *_:
                 self.push(f'200 {command} ok')
 
@@ -219,9 +222,6 @@ class DummyFTPHandler(asynchat.async_chat):
     def cmd_quit(self, arg):
         self.push('221 quit ok')
         self.close()
-
-    def cmd_stor(self, arg):
-        self.push('125 stor ok')
 
     def cmd_rest(self, arg):
         self.rest = arg
