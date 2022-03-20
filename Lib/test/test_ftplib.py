@@ -164,6 +164,11 @@ class DummyFTPHandler(asynchat.async_chat):
             case 'mkd', argument:
                 self.push(f'257 "{argument}"')
 
+            case 'mlsd':
+                self.push('125 mlsd ok')
+                self.dtp.push(MLSD_DATA)
+                self.dtp.close_when_done()
+
             case 'nlst':
                 self.push('125 nlst ok')
                 self.dtp.push(NLST_DATA)
@@ -243,11 +248,6 @@ class DummyFTPHandler(asynchat.async_chat):
 
     def push(self, data):
         asynchat.async_chat.push(self, data.encode(self.encoding) + b'\r\n')
-
-    def cmd_mlsd(self, arg):
-        self.push('125 mlsd ok')
-        self.dtp.push(MLSD_DATA)
-        self.dtp.close_when_done()
 
     def cmd_setlongretr(self, arg):
         # For testing. Next RETR will return long line.
