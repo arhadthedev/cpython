@@ -185,6 +185,13 @@ class DummyFTPHandler(asynchat.async_chat):
                 self.rest = argument
                 self.push('350 rest ok')
 
+            case 'retr', _:
+                self.push('125 retr ok')
+                offset = 0 if self.rest is None else int(self.rest)
+                self.dtp.push(self.next_retr_data[offset:])
+                self.dtp.close_when_done()
+                self.rest = None
+
             case 'size', _:
                 self.push('250 1000')
 
@@ -226,16 +233,6 @@ class DummyFTPHandler(asynchat.async_chat):
 
     def push(self, data):
         asynchat.async_chat.push(self, data.encode(self.encoding) + b'\r\n')
-
-    def cmd_retr(self, arg):
-        self.push('125 retr ok')
-        if self.rest is not None:
-            offset = int(self.rest)
-        else:
-            offset = 0
-        self.dtp.push(self.next_retr_data[offset:])
-        self.dtp.close_when_done()
-        self.rest = None
 
     def cmd_list(self, arg):
         self.push('125 list ok')
