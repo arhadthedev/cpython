@@ -138,6 +138,9 @@ class DummyFTPHandler(asynchat.async_chat):
     # May be overriden in a derived class to add more commands
     def process_command(self, parsed):
         match parsed:
+            case 'noop' | 'opts' | 'type' as command, *_:
+                self.push(f'200 {command} ok')
+
             case cmd, *rest:
                 if hasattr(self, 'cmd_' + cmd):
                     method = getattr(self, 'cmd_' + cmd)
@@ -189,9 +192,6 @@ class DummyFTPHandler(asynchat.async_chat):
         # sends back the received string (used by the test suite)
         self.push(arg)
 
-    def cmd_noop(self, arg):
-        self.push('200 noop ok')
-
     def cmd_user(self, arg):
         self.push('331 username ok')
 
@@ -224,9 +224,6 @@ class DummyFTPHandler(asynchat.async_chat):
 
     def cmd_pwd(self, arg):
         self.push('257 "pwd ok"')
-
-    def cmd_type(self, arg):
-        self.push('200 type ok')
 
     def cmd_quit(self, arg):
         self.push('221 quit ok')
@@ -261,9 +258,6 @@ class DummyFTPHandler(asynchat.async_chat):
         self.push('125 nlst ok')
         self.dtp.push(NLST_DATA)
         self.dtp.close_when_done()
-
-    def cmd_opts(self, arg):
-        self.push('200 opts ok')
 
     def cmd_mlsd(self, arg):
         self.push('125 mlsd ok')
