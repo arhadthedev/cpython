@@ -454,13 +454,13 @@ if ssl is not None:
                     self.push('234 AUTH TLS successful')
                     self.secure_connection()
 
+                case 'ccc':
+                    self.push('220 Reverting back to clear-text')
+                    self._ccc = True
+                    self._do_ssl_shutdown()
+
                 case _:
                     super(DummyFTPHandler, self).process_command(parsed)
-
-        def cmd_ccc(self, line):
-            self.push('220 Reverting back to clear-text')
-            self._ccc = True
-            self._do_ssl_shutdown()
 
         def cmd_pbsz(self, line):
             """Negotiate size of buffer for secure data transfer.
