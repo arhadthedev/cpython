@@ -130,18 +130,20 @@ class DummyFTPHandler(asynchat.async_chat):
         if self.next_response:
             self.push(self.next_response)
             self.next_response = ''
-        cmd = line.split(' ')[0].lower()
-        self.last_received_cmd = cmd
-        space = line.find(' ')
-        if space != -1:
-            arg = line[space + 1:]
-        else:
-            arg = ""
-        if hasattr(self, 'cmd_' + cmd):
-            method = getattr(self, 'cmd_' + cmd)
-            method(arg)
-        else:
-            self.push('550 command "%s" not understood.' %cmd)
+        parsed = line.split(' ', maxsplit=1)
+        parsed[0] = parsed[0].lower()
+        self.last_received_cmd = parsed[0]
+        self.process_command(tuple(parsed))
+
+    # May be overriden in a derived class to add more commands
+    def process_command(self, parsed):
+        match parsed:
+            case cmd, *rest:
+                if hasattr(self, 'cmd_' + cmd):
+                    method = getattr(self, 'cmd_' + cmd)
+                    method(rest[0] if rest else '')
+                else:
+                    self.push('550 command "%s" not understood.' %cmd)
 
     def handle_error(self):
         default_error_handler()
@@ -465,6 +467,11 @@ if ssl is not None:
             DummyFTPHandler.__init__(self, conn, encoding=encoding)
             self.secure_data_channel = False
             self._ccc = False
+
+        def process_command(self, parsed):
+            match parsed:
+                case _:
+                    super(DummyFTPHandler, self).process_command(parsed)
 
         def cmd_auth(self, line):
             """Set up secure control channel."""
