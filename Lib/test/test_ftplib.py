@@ -340,15 +340,16 @@ if ssl is not None:
             try:
                 self.socket.do_handshake()
             except ssl.SSLError as err:
-                if err.args[0] in (ssl.SSL_ERROR_WANT_READ,
-                                   ssl.SSL_ERROR_WANT_WRITE):
-                    return
-                elif err.args[0] == ssl.SSL_ERROR_EOF:
-                    return self.handle_close()
-                # TODO: SSLError does not expose alert information
-                elif "SSLV3_ALERT_BAD_CERTIFICATE" in err.args[1]:
-                    return self.handle_close()
-                raise
+                match err.args[0]:
+                    case ssl.SSL_ERROR_WANT_READ | ssl.SSL_ERROR_WANT_WRITE:
+                        return
+                    case ssl.SSL_ERROR_EOF:
+                        return self.handle_close()
+                    # TODO: SSLError does not expose alert information
+                    case _ if "SSLV3_ALERT_BAD_CERTIFICATE" in err.args[1]:
+                        return self.handle_close()
+                    case _:
+                        raise
             except OSError as err:
                 if err.args[0] == errno.ECONNABORTED:
                     return self.handle_close()
@@ -405,13 +406,14 @@ if ssl is not None:
             try:
                 return super(SSLConnection, self).recv(buffer_size)
             except ssl.SSLError as err:
-                if err.args[0] in (ssl.SSL_ERROR_WANT_READ,
-                                   ssl.SSL_ERROR_WANT_WRITE):
-                    return b''
-                if err.args[0] in (ssl.SSL_ERROR_EOF, ssl.SSL_ERROR_ZERO_RETURN):
-                    self.handle_close()
-                    return b''
-                raise
+                match err.args[0]:
+                    case ssl.SSL_ERROR_WANT_READ | ssl.SSL_ERROR_WANT_WRITE:
+                        return b''
+                    case ssl.SSL_ERROR_EOF | ssl.SSL_ERROR_ZERO_RETURN:
+                        self.handle_close()
+                        return b''
+                    case _:
+                        raise
 
         def handle_error(self):
             default_error_handler()
