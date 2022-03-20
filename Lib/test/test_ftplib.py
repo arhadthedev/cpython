@@ -459,15 +459,14 @@ if ssl is not None:
                     self._ccc = True
                     self._do_ssl_shutdown()
 
+                case 'pbsz', _:
+                    # Negotiate size of buffer for secure data transfer.
+                    # For TLS/SSL the only valid value for the parameter is '0'.
+                    # Any other value is accepted but ignored.
+                    self.push('200 PBSZ=0 successful')
+
                 case _:
                     super(DummyFTPHandler, self).process_command(parsed)
-
-        def cmd_pbsz(self, line):
-            """Negotiate size of buffer for secure data transfer.
-            For TLS/SSL the only valid value for the parameter is '0'.
-            Any other value is accepted but ignored.
-            """
-            self.push('200 PBSZ=0 successful.')
 
         def cmd_prot(self, line):
             """Setup un/secure data channel."""
