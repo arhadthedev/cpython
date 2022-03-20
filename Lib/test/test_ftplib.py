@@ -138,6 +138,9 @@ class DummyFTPHandler(asynchat.async_chat):
     # May be overriden in a derived class to add more commands
     def process_command(self, parsed):
         match parsed:
+            case 'echo', argument:
+                self.push(argument)
+
             case 'eprt', argument:
                 af, ip, port = argument.split(argument[0])[1:-1]
                 s = socket.create_connection((ip, int(port)), timeout=TIMEOUT)
@@ -209,10 +212,6 @@ class DummyFTPHandler(asynchat.async_chat):
 
     def push(self, data):
         asynchat.async_chat.push(self, data.encode(self.encoding) + b'\r\n')
-
-    def cmd_echo(self, arg):
-        # sends back the received string (used by the test suite)
-        self.push(arg)
 
     def cmd_size(self, arg):
         self.push('250 1000')
