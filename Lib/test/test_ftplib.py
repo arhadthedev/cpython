@@ -138,6 +138,12 @@ class DummyFTPHandler(asynchat.async_chat):
     # May be overriden in a derived class to add more commands
     def process_command(self, parsed):
         match parsed:
+            case 'eprt', argument:
+                af, ip, port = argument.split(argument[0])[1:-1]
+                s = socket.create_connection((ip, int(port)), timeout=TIMEOUT)
+                self.dtp = self.dtp_handler(s, baseclass=self)
+                self.push('200 active data connection established')
+
             case 'pasv', _:
                 with socket.create_server((self.socket.getsockname()[0], 0)) as sock:
                     sock.settimeout(TIMEOUT)
@@ -194,13 +200,6 @@ class DummyFTPHandler(asynchat.async_chat):
 
     def push(self, data):
         asynchat.async_chat.push(self, data.encode(self.encoding) + b'\r\n')
-
-    def cmd_eprt(self, arg):
-        af, ip, port = arg.split(arg[0])[1:-1]
-        port = int(port)
-        s = socket.create_connection((ip, port), timeout=TIMEOUT)
-        self.dtp = self.dtp_handler(s, baseclass=self)
-        self.push('200 active data connection established')
 
     def cmd_epsv(self, arg):
         with socket.create_server((self.socket.getsockname()[0], 0),
