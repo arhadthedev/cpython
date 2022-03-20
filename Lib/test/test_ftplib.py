@@ -141,6 +141,9 @@ class DummyFTPHandler(asynchat.async_chat):
             case 'noop' | 'opts' | 'type' as command, *_:
                 self.push(f'200 {command} ok')
 
+            case 'user', _:
+                self.push('331 user ok')
+
             case cmd, *rest:
                 if hasattr(self, 'cmd_' + cmd):
                     method = getattr(self, 'cmd_' + cmd)
@@ -191,9 +194,6 @@ class DummyFTPHandler(asynchat.async_chat):
     def cmd_echo(self, arg):
         # sends back the received string (used by the test suite)
         self.push(arg)
-
-    def cmd_user(self, arg):
-        self.push('331 username ok')
 
     def cmd_pass(self, arg):
         self.push('230 password ok')
