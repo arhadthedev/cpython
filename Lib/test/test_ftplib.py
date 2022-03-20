@@ -241,12 +241,8 @@ class DummyFTPHandler(asynchat.async_chat):
             case 'rnfr', _:
                 self.push('350 rnfr ok')
 
-            case cmd, *rest:
-                if hasattr(self, 'cmd_' + cmd):
-                    method = getattr(self, 'cmd_' + cmd)
-                    method(rest[0] if rest else '')
-                else:
-                    self.push('550 command "%s" not understood.' %cmd)
+            case unknown, *_:
+                self.push(f'550 command "{unknown}" not understood')
 
     def handle_error(self):
         default_error_handler()
