@@ -181,6 +181,10 @@ class DummyFTPHandler(asynchat.async_chat):
                 self.push('221 quit ok')
                 self.close()
 
+            case 'rest', argument:
+                self.rest = argument
+                self.push('350 rest ok')
+
             case 'size', _:
                 self.push('250 1000')
 
@@ -222,10 +226,6 @@ class DummyFTPHandler(asynchat.async_chat):
 
     def push(self, data):
         asynchat.async_chat.push(self, data.encode(self.encoding) + b'\r\n')
-
-    def cmd_rest(self, arg):
-        self.rest = arg
-        self.push('350 rest ok')
 
     def cmd_retr(self, arg):
         self.push('125 retr ok')
