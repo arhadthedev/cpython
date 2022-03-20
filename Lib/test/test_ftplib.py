@@ -156,6 +156,9 @@ class DummyFTPHandler(asynchat.async_chat):
                     conn = sock.accept()[0]
                     self.dtp = self.dtp_handler(conn, baseclass=self)
 
+            case 'mkd', argument:
+                self.push(f'257 "{argument}"')
+
             case 'pasv', _:
                 with socket.create_server((self.socket.getsockname()[0], 0)) as sock:
                     sock.settimeout(TIMEOUT)
@@ -215,9 +218,6 @@ class DummyFTPHandler(asynchat.async_chat):
 
     def push(self, data):
         asynchat.async_chat.push(self, data.encode(self.encoding) + b'\r\n')
-
-    def cmd_mkd(self, arg):
-        self.push('257 "%s"' %arg)
 
     def cmd_quit(self, arg):
         self.push('221 quit ok')
