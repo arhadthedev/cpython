@@ -141,6 +141,9 @@ class DummyFTPHandler(asynchat.async_chat):
             case 'noop' | 'opts' | 'type' as command, *_:
                 self.push(f'200 {command} ok')
 
+            case 'abor':
+                self.push('226 abor ok')
+
             case 'pass' | 'acct' as command, _:
                 self.push(f'230 {command} ok')
             
@@ -216,9 +219,6 @@ class DummyFTPHandler(asynchat.async_chat):
     def cmd_quit(self, arg):
         self.push('221 quit ok')
         self.close()
-
-    def cmd_abor(self, arg):
-        self.push('226 abor ok')
 
     def cmd_stor(self, arg):
         self.push('125 stor ok')
