@@ -449,13 +449,13 @@ if ssl is not None:
 
         def process_command(self, parsed):
             match parsed:
+                case 'auth', _:
+                    # Set up secure control channel.
+                    self.push('234 AUTH TLS successful')
+                    self.secure_connection()
+
                 case _:
                     super(DummyFTPHandler, self).process_command(parsed)
-
-        def cmd_auth(self, line):
-            """Set up secure control channel."""
-            self.push('234 AUTH TLS successful')
-            self.secure_connection()
 
         def cmd_ccc(self, line):
             self.push('220 Reverting back to clear-text')
