@@ -1,3 +1,4 @@
-Adds a ``start_tls()`` method to :class:`~asyncio.streams.StreamWriter`,
-which upgrades the connection with TLS using the given
-:class:`~ssl.SSLContext`.
+Add :meth:`~asyncio.streams.StreamWriter.start_tls` which upgrades the
+connection with TLS using the given :class:`~ssl.SSLContext` and
+:meth:`~asyncio.streams.StreamWriter.shutdown_tls` which downgrades the
+connection back to plain text. Patch by Ian Good.

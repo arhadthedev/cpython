@@ -247,8 +247,9 @@ asyncio
   (Contributed by Alex Grönholm in :issue:`46805`.)
 
 * Add :meth:`~asyncio.streams.StreamWriter.start_tls` method for upgrading
-  existing stream-based connections to TLS. (Contributed by Ian Good in
-  :issue:`34975`.)
+  existing stream-based connections to TLS and
+  :meth:`~asyncio.streams.StreamWriter.shutdown_tls` method for downgrading it
+  back. (Contributed by Ian Good in :issue:`34975`.)
 
 fractions
 ---------
