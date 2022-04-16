@@ -1,0 +1,2 @@
+:class:`asyncio.sslproto._SSLProtocolTransport` was merged into
+:class:`asyncio.sslproto.SSLProtocol`.
