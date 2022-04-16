@@ -87,24 +87,6 @@ class SSLProtocol(protocols.BufferedProtocol,
     #
     # Methods common for both sides
     #
-    def get_extra_info(self, name, default=None):
-        """Get optional transport information."""
-        if name in self._extra:
-            return self._extra[name]
-        elif self._transport is not None:
-            return super().get_extra_info(name, default)
-        else:
-            return default
-
-    #
-    # The first (Protocol) side that looks at the encrypted transport
-    #
-    max_size = 256 * 1024   # Buffer size passed to read()
-
-    _handshake_start_time = None
-    _handshake_timeout_handle = None
-    _shutdown_timeout_handle = None
-
     def __init__(self, loop, app_protocol, sslcontext, waiter,
                  server_side=False, server_hostname=None,
                  call_connection_made=True,
@@ -187,6 +169,26 @@ class SSLProtocol(protocols.BufferedProtocol,
         self._outgoing_low_water = 0
         self._set_write_buffer_limits()
         self._get_app_transport()
+
+        self._closed = False
+
+    def get_extra_info(self, name, default=None):
+        """Get optional transport information."""
+        if name in self._extra:
+            return self._extra[name]
+        elif self._transport is not None:
+            return super().get_extra_info(name, default)
+        else:
+            return default
+
+    #
+    # The first (Protocol) side that looks at the encrypted transport
+    #
+    max_size = 256 * 1024   # Buffer size passed to read()
+
+    _handshake_start_time = None
+    _handshake_timeout_handle = None
+    _shutdown_timeout_handle = None
 
     def _set_app_protocol(self, app_protocol):
         self._app_protocol = app_protocol
@@ -759,10 +761,6 @@ class SSLProtocol(protocols.BufferedProtocol,
     #
     _start_tls_compatible = True
     _sendfile_compatible = constants._SendfileMode.FALLBACK
-
-    def __init__(self, loop):
-        self._loop = loop
-        self._closed = False
 
     def set_protocol(self, protocol):
         self._set_app_protocol(protocol)
