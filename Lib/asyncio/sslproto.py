@@ -75,197 +75,18 @@ def add_flowcontrol_defaults(high, low, kb):
     return hi, lo
 
 
-class _SSLProtocolTransport(transports._FlowControlMixin,
-                            transports.Transport):
+class SSLProtocol(protocols.BufferedProtocol,
+                  transports._FlowControlMixin,
+                  transports.Transport):
+    """In-memory TLS encryptor/decryptor.
 
-    _start_tls_compatible = True
-    _sendfile_compatible = constants._SendfileMode.FALLBACK
+    This class is a shim inserted between the encrypted asyncio.Transport
+    and the plaintext asyncio.protocols.Protocol.
+    """
 
-    def __init__(self, loop, ssl_protocol):
-        self._loop = loop
-        self._ssl_protocol = ssl_protocol
-        self._closed = False
-
-    def get_extra_info(self, name, default=None):
-        """Get optional transport information."""
-        return self._ssl_protocol._get_extra_info(name, default)
-
-    def set_protocol(self, protocol):
-        self._ssl_protocol._set_app_protocol(protocol)
-
-    def get_protocol(self):
-        return self._ssl_protocol._app_protocol
-
-    def is_closing(self):
-        return self._closed
-
-    def close(self):
-        """Close the transport.
-
-        Buffered data will be flushed asynchronously.  No more data
-        will be received.  After all buffered data is flushed, the
-        protocol's connection_lost() method will (eventually) called
-        with None as its argument.
-        """
-        self._closed = True
-        self._ssl_protocol._start_shutdown()
-
-    def __del__(self, _warnings=warnings):
-        if not self._closed:
-            self._closed = True
-            _warnings.warn(
-                "unclosed transport <asyncio._SSLProtocolTransport "
-                "object>", ResourceWarning)
-
-    def is_reading(self):
-        return not self._ssl_protocol._app_reading_paused
-
-    def pause_reading(self):
-        """Pause the receiving end.
-
-        No data will be passed to the protocol's data_received()
-        method until resume_reading() is called.
-        """
-        self._ssl_protocol._pause_reading()
-
-    def resume_reading(self):
-        """Resume the receiving end.
-
-        Data received will once again be passed to the protocol's
-        data_received() method.
-        """
-        self._ssl_protocol._resume_reading()
-
-    def set_write_buffer_limits(self, high=None, low=None):
-        """Set the high- and low-water limits for write flow control.
-
-        These two values control when to call the protocol's
-        pause_writing() and resume_writing() methods.  If specified,
-        the low-water limit must be less than or equal to the
-        high-water limit.  Neither value can be negative.
-
-        The defaults are implementation-specific.  If only the
-        high-water limit is given, the low-water limit defaults to an
-        implementation-specific value less than or equal to the
-        high-water limit.  Setting high to zero forces low to zero as
-        well, and causes pause_writing() to be called whenever the
-        buffer becomes non-empty.  Setting low to zero causes
-        resume_writing() to be called only once the buffer is empty.
-        Use of zero for either limit is generally sub-optimal as it
-        reduces opportunities for doing I/O and computation
-        concurrently.
-        """
-        self._ssl_protocol._set_write_buffer_limits(high, low)
-        self._ssl_protocol._control_app_writing()
-
-    def get_write_buffer_limits(self):
-        return (self._ssl_protocol._outgoing_low_water,
-                self._ssl_protocol._outgoing_high_water)
-
-    def get_write_buffer_size(self):
-        """Return the current size of the write buffers."""
-        return self._ssl_protocol._get_write_buffer_size()
-
-    def set_read_buffer_limits(self, high=None, low=None):
-        """Set the high- and low-water limits for read flow control.
-
-        These two values control when to call the upstream transport's
-        pause_reading() and resume_reading() methods.  If specified,
-        the low-water limit must be less than or equal to the
-        high-water limit.  Neither value can be negative.
-
-        The defaults are implementation-specific.  If only the
-        high-water limit is given, the low-water limit defaults to an
-        implementation-specific value less than or equal to the
-        high-water limit.  Setting high to zero forces low to zero as
-        well, and causes pause_reading() to be called whenever the
-        buffer becomes non-empty.  Setting low to zero causes
-        resume_reading() to be called only once the buffer is empty.
-        Use of zero for either limit is generally sub-optimal as it
-        reduces opportunities for doing I/O and computation
-        concurrently.
-        """
-        self._ssl_protocol._set_read_buffer_limits(high, low)
-        self._ssl_protocol._control_ssl_reading()
-
-    def get_read_buffer_limits(self):
-        return (self._ssl_protocol._incoming_low_water,
-                self._ssl_protocol._incoming_high_water)
-
-    def get_read_buffer_size(self):
-        """Return the current size of the read buffer."""
-        return self._ssl_protocol._get_read_buffer_size()
-
-    def get_write_buffer_limits(self):
-        """Get the high and low watermarks for write flow control.
-        Return a tuple (low, high) where low and high are
-        positive number of bytes."""
-        return self._ssl_protocol._transport.get_write_buffer_limits()
-
-    @property
-    def _protocol_paused(self):
-        # Required for sendfile fallback pause_writing/resume_writing logic
-        return self._ssl_protocol._app_writing_paused
-
-    def write(self, data):
-        """Write some data bytes to the transport.
-
-        This does not block; it buffers the data and arranges for it
-        to be sent out asynchronously.
-        """
-        if not isinstance(data, (bytes, bytearray, memoryview)):
-            raise TypeError(f"data: expecting a bytes-like instance, "
-                            f"got {type(data).__name__}")
-        if not data:
-            return
-        self._ssl_protocol._write_appdata((data,))
-
-    def writelines(self, list_of_data):
-        """Write a list (or any iterable) of data bytes to the transport.
-
-        The default implementation concatenates the arguments and
-        calls write() on the result.
-        """
-        self._ssl_protocol._write_appdata(list_of_data)
-
-    def write_eof(self):
-        """Close the write end after flushing buffered data.
-
-        This raises :exc:`NotImplementedError` right now.
-        """
-        raise NotImplementedError
-
-    def can_write_eof(self):
-        """Return True if this transport supports write_eof(), False if not."""
-        return False
-
-    def abort(self):
-        """Close the transport immediately.
-
-        Buffered data will be lost.  No more data will be received.
-        The protocol's connection_lost() method will (eventually) be
-        called with None as its argument.
-        """
-        self._closed = True
-        self._ssl_protocol._abort()
-
-    def _force_close(self, exc):
-        self._closed = True
-        self._ssl_protocol._abort(exc)
-
-    def _test__append_write_backlog(self, data):
-        # for test only
-        self._ssl_protocol._write_backlog.append(data)
-        self._ssl_protocol._write_buffer_size += len(data)
-
-
-class SSLProtocol(protocols.BufferedProtocol):
-    max_size = 256 * 1024   # Buffer size passed to read()
-
-    _handshake_start_time = None
-    _handshake_timeout_handle = None
-    _shutdown_timeout_handle = None
-
+    #
+    # Methods common for both sides
+    #
     def __init__(self, loop, app_protocol, sslcontext, waiter,
                  server_side=False, server_hostname=None,
                  call_connection_made=True,
@@ -302,7 +123,7 @@ class SSLProtocol(protocols.BufferedProtocol):
         self._sslcontext = sslcontext
         # SSL-specific extra info. More info are set when the handshake
         # completes.
-        self._extra = dict(sslcontext=sslcontext)
+        self._extra = {'sslcontext': sslcontext}
 
         # App data write buffering
         self._write_backlog = collections.deque()
@@ -348,6 +169,26 @@ class SSLProtocol(protocols.BufferedProtocol):
         self._outgoing_low_water = 0
         self._set_write_buffer_limits()
         self._get_app_transport()
+
+        self._closed = False
+
+    def get_extra_info(self, name, default=None):
+        """Get optional transport information."""
+        if name in self._extra:
+            return self._extra[name]
+        elif self._transport is not None:
+            return super().get_extra_info(name, default)
+        else:
+            return default
+
+    #
+    # The first (Protocol) side that looks at the encrypted transport
+    #
+    max_size = 256 * 1024   # Buffer size passed to read()
+
+    _handshake_start_time = None
+    _handshake_timeout_handle = None
+    _shutdown_timeout_handle = None
 
     def _set_app_protocol(self, app_protocol):
         self._app_protocol = app_protocol
@@ -480,14 +321,6 @@ class SSLProtocol(protocols.BufferedProtocol):
         except Exception:
             self._transport.close()
             raise
-
-    def _get_extra_info(self, name, default=None):
-        if name in self._extra:
-            return self._extra[name]
-        elif self._transport is not None:
-            return self._transport.get_extra_info(name, default)
-        else:
-            return default
 
     def _set_state(self, new_state):
         allowed = False
@@ -922,3 +755,176 @@ class SSLProtocol(protocols.BufferedProtocol):
                 'transport': self._transport,
                 'protocol': self,
             })
+
+    #
+    # The second (Transport) side that looks at the plaintext protocol
+    #
+    _start_tls_compatible = True
+    _sendfile_compatible = constants._SendfileMode.FALLBACK
+
+    def set_protocol(self, protocol):
+        self._set_app_protocol(protocol)
+
+    def get_protocol(self):
+        return self._app_protocol
+
+    def is_closing(self):
+        return self._closed
+
+    def close(self):
+        """Close the transport.
+
+        Buffered data will be flushed asynchronously.  No more data
+        will be received.  After all buffered data is flushed, the
+        protocol's connection_lost() method will (eventually) called
+        with None as its argument.
+        """
+        self._closed = True
+        self._start_shutdown()
+
+    def __del__(self, _warnings=warnings):
+        if not self._closed:
+            _warnings.warn(
+                "unclosed transport <asyncio.SSLProtocol object>",
+                ResourceWarning)
+
+    def is_reading(self):
+        return not self._app_reading_paused
+
+    def pause_reading(self):
+        """Pause the receiving end.
+
+        No data will be passed to the protocol's data_received()
+        method until resume_reading() is called.
+        """
+        self._pause_reading()
+
+    def resume_reading(self):
+        """Resume the receiving end.
+
+        Data received will once again be passed to the protocol's
+        data_received() method.
+        """
+        self._resume_reading()
+
+    def set_write_buffer_limits(self, high=None, low=None):
+        """Set the high- and low-water limits for write flow control.
+
+        These two values control when to call the protocol's
+        pause_writing() and resume_writing() methods.  If specified,
+        the low-water limit must be less than or equal to the
+        high-water limit.  Neither value can be negative.
+
+        The defaults are implementation-specific.  If only the
+        high-water limit is given, the low-water limit defaults to an
+        implementation-specific value less than or equal to the
+        high-water limit.  Setting high to zero forces low to zero as
+        well, and causes pause_writing() to be called whenever the
+        buffer becomes non-empty.  Setting low to zero causes
+        resume_writing() to be called only once the buffer is empty.
+        Use of zero for either limit is generally sub-optimal as it
+        reduces opportunities for doing I/O and computation
+        concurrently.
+        """
+        self._set_write_buffer_limits(high, low)
+        self._control_app_writing()
+
+    def get_write_buffer_limits(self):
+        return (self._outgoing_low_water,
+                self._outgoing_high_water)
+
+    def get_write_buffer_size(self):
+        """Return the current size of the write buffers."""
+        return self._get_write_buffer_size()
+
+    def set_read_buffer_limits(self, high=None, low=None):
+        """Set the high- and low-water limits for read flow control.
+
+        These two values control when to call the upstream transport's
+        pause_reading() and resume_reading() methods.  If specified,
+        the low-water limit must be less than or equal to the
+        high-water limit.  Neither value can be negative.
+
+        The defaults are implementation-specific.  If only the
+        high-water limit is given, the low-water limit defaults to an
+        implementation-specific value less than or equal to the
+        high-water limit.  Setting high to zero forces low to zero as
+        well, and causes pause_reading() to be called whenever the
+        buffer becomes non-empty.  Setting low to zero causes
+        resume_reading() to be called only once the buffer is empty.
+        Use of zero for either limit is generally sub-optimal as it
+        reduces opportunities for doing I/O and computation
+        concurrently.
+        """
+        self._set_read_buffer_limits(high, low)
+        self._control_ssl_reading()
+
+    def get_read_buffer_limits(self):
+        return (self._incoming_low_water,
+                self._incoming_high_water)
+
+    def get_read_buffer_size(self):
+        """Return the current size of the read buffer."""
+        return self._get_read_buffer_size()
+
+    def get_write_buffer_limits(self):
+        """Get the high and low watermarks for write flow control.
+        Return a tuple (low, high) where low and high are
+        positive number of bytes."""
+        return self._transport.get_write_buffer_limits()
+
+    @property
+    def _protocol_paused(self):
+        # Required for sendfile fallback pause_writing/resume_writing logic
+        return self._app_writing_paused
+
+    def write(self, data):
+        """Write some data bytes to the transport.
+
+        This does not block; it buffers the data and arranges for it
+        to be sent out asynchronously.
+        """
+        if not isinstance(data, (bytes, bytearray, memoryview)):
+            raise TypeError(f"data: expecting a bytes-like instance, "
+                            f"got {type(data).__name__}")
+        if not data:
+            return
+        self._write_appdata((data,))
+
+    def writelines(self, list_of_data):
+        """Write a list (or any iterable) of data bytes to the transport.
+
+        The default implementation concatenates the arguments and
+        calls write() on the result.
+        """
+        self._write_appdata(list_of_data)
+
+    def write_eof(self):
+        """Close the write end after flushing buffered data.
+
+        This raises :exc:`NotImplementedError` right now.
+        """
+        raise NotImplementedError
+
+    def can_write_eof(self):
+        """Return True if this transport supports write_eof(), False if not."""
+        return False
+
+    def abort(self):
+        """Close the transport immediately.
+
+        Buffered data will be lost.  No more data will be received.
+        The protocol's connection_lost() method will (eventually) be
+        called with None as its argument.
+        """
+        self._closed = True
+        self._abort()
+
+    def _force_close(self, exc):
+        self._closed = True
+        self._abort(exc)
+
+    def _test__append_write_backlog(self, data):
+        # for test only
+        self._write_backlog.append(data)
+        self._write_buffer_size += len(data)
