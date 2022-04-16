@@ -324,8 +324,6 @@ class _ProactorBaseWritePipeTransport(_ProactorBasePipeTransport,
                                       transports.WriteTransport):
     """Transport for write pipes."""
 
-    _start_tls_compatible = True
-
     def __init__(self, *args, **kw):
         super().__init__(*args, **kw)
         self._empty_waiter = None

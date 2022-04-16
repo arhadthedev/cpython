@@ -1229,10 +1229,6 @@ class BaseEventLoop(events.AbstractEventLoop):
                 f'sslcontext is expected to be an instance of ssl.SSLContext, '
                 f'got {sslcontext!r}')
 
-        if not getattr(transport, '_start_tls_compatible', False):
-            raise TypeError(
-                f'transport {transport!r} is not supported by start_tls()')
-
         waiter = self.create_future()
         ssl_protocol = sslproto.SSLProtocol(
             self, protocol, sslcontext, waiter,

@@ -862,6 +862,10 @@ TLS Upgrade
 
       Added the *ssl_shutdown_timeout* parameter.
 
+   .. versionchanged:: 3.12
+
+      Any transport can be upgraded to TLS.
+
 
 
 Watching file descriptors
