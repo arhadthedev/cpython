@@ -15,3 +15,15 @@ if(HAVE_UUID_CREATE and HAVE_UUID_ENC_BE)
     add_library(uuid_lib INTERFACE Lib/uuid.py)
     add_library(uuid_test INTERFACE Lib/test_uuid.py)
 endif()
+
+add_library(_zoneinfo SHARED Modules/_zoneinfo.c)
+add_library(zoneinfo_lib INTERFACE
+    zoneinfo\_common.py
+    zoneinfo\__init__.py
+    zoneinfo\_tzpath.py
+    zoneinfo\_zoneinfo.py
+target_sources(zoneinfo_tests PUBLIC
+    test\test_zoneinfo\__init__.py
+    test\test_zoneinfo\__main__.py
+    test\test_zoneinfo\_support.py
+    test\test_zoneinfo\test_zoneinfo.py)
