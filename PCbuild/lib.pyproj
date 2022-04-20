@@ -1371,7 +1371,6 @@
     <Compile Include="test\test_userstring.py" />
     <Compile Include="test\test_utf8source.py" />
     <Compile Include="test\test_uu.py" />
-    <Compile Include="test\test_uuid.py" />
     <Compile Include="test\test_venv.py" />
     <Compile Include="test\test_wait3.py" />
     <Compile Include="test\test_wait4.py" />
