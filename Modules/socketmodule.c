@@ -114,6 +114,15 @@ Local naming conventions:
 # include <sanitizer/msan_interface.h>
 #endif
 
+/*[clinic input]
+module _socket
+
+class _socket.socket "PySocketSockObject *" "&PyTypeObject"
+[clinic start generated code]*/
+/*[clinic end generated code: output=da39a3ee5e6b4b0d input=6dc78b102ad01303]*/
+
+#include "clinic/socketmodule.c.h"
+
 /* Socket object documentation */
 PyDoc_STRVAR(sock_doc,
 "socket(family=AF_INET, type=SOCK_STREAM, proto=0) -> socket object\n\
@@ -3033,77 +3042,73 @@ Set a socket option.  See the Unix manual for level and option.\n\
 The value argument can either be an integer, a string buffer, or\n\
 None, optlen.");
 
+/*[clinic input]
+_socket.socket.getsockopt as sock_getsockopt
 
-/* s.getsockopt() method.
-   With two arguments, retrieves an integer option.
-   With a third integer argument, retrieves a string buffer of that size;
-   use optional built-in module 'struct' to decode the string. */
+    level: int
+    option: int
+    buffersize: int = 0
+    /
+
+Get a socket option.
+
+See the Unix manual for level and option. If a nonzero buffersize argument
+is given, the return value is a string of that length; otherwise it is an
+integer.
+[clinic start generated code]*/
 
 static PyObject *
-sock_getsockopt(PySocketSockObject *s, PyObject *args)
+sock_getsockopt_impl(PySocketSockObject *self, int level, int option,
+                     int buffersize)
+/*[clinic end generated code: output=b05ebf9170b797ba input=76929a3c2873e3df]*/
 {
-    int level;
-    int optname;
     int res;
-    PyObject *buf;
-    socklen_t buflen = 0;
     int flag = 0;
     socklen_t flagsize;
 
-    if (!PyArg_ParseTuple(args, "ii|i:getsockopt",
-                          &level, &optname, &buflen))
-        return NULL;
-
     if (buflen == 0) {
 #ifdef AF_VSOCK
-        if (s->sock_family == AF_VSOCK) {
+        if (self->sock_family == AF_VSOCK) {
             uint64_t vflag = 0; // Must be set width of 64 bits
             flagsize = sizeof vflag;
-            res = getsockopt(s->sock_fd, level, optname,
+            res = getsockopt(self->sock_fd, level, option,
                          (void *)&vflag, &flagsize);
             if (res < 0)
-                return s->errorhandler();
+                return self->errorhandler();
             return PyLong_FromUnsignedLong(vflag);
         }
 #endif
         flagsize = sizeof flag;
-        res = getsockopt(s->sock_fd, level, optname,
+        res = getsockopt(self->sock_fd, level, option,
                          (void *)&flag, &flagsize);
         if (res < 0)
-            return s->errorhandler();
+            return self->errorhandler();
         return PyLong_FromLong(flag);
     }
 #ifdef AF_VSOCK
-    if (s->sock_family == AF_VSOCK) {
+    if (self->sock_family == AF_VSOCK) {
         PyErr_SetString(PyExc_OSError,
                         "getsockopt string buffer not allowed");
         return NULL;
         }
 #endif
-    if (buflen <= 0 || buflen > 1024) {
+    if (buffersize <= 0 || buffersize > 1024) {
         PyErr_SetString(PyExc_OSError,
-                        "getsockopt buflen out of range");
+                        "getsockopt buffersize out of range");
         return NULL;
     }
-    buf = PyBytes_FromStringAndSize((char *)NULL, buflen);
+    PyObject *buf = PyBytes_FromStringAndSize((char *)NULL, buffersize);
     if (buf == NULL)
         return NULL;
-    res = getsockopt(s->sock_fd, level, optname,
-                     (void *)PyBytes_AS_STRING(buf), &buflen);
+    res = getsockopt(self->sock_fd, level, option,
+                     (void *)PyBytes_AS_STRING(buf), &buffersize);
     if (res < 0) {
         Py_DECREF(buf);
-        return s->errorhandler();
+        return self->errorhandler();
     }
     _PyBytes_Resize(&buf, buflen);
     return buf;
 }
-
-PyDoc_STRVAR(getsockopt_doc,
-"getsockopt(level, option[, buffersize]) -> value\n\
-\n\
-Get a socket option.  See the Unix manual for level and option.\n\
-If a nonzero buffersize argument is given, the return value is a\n\
-string of that length; otherwise it is an integer.");
 
 
 /* s.bind(sockaddr) method */
@@ -4933,8 +4938,7 @@ static PyMethodDef sock_methods[] = {
 #endif
     {"getsockname",       (PyCFunction)sock_getsockname,
                       METH_NOARGS, getsockname_doc},
-    {"getsockopt",        (PyCFunction)sock_getsockopt, METH_VARARGS,
-                      getsockopt_doc},
+    SOCK_GETSOCKOPT_METHODDEF
 #if defined(MS_WINDOWS) && defined(SIO_RCVALL)
     {"ioctl",             (PyCFunction)sock_ioctl, METH_VARARGS,
                       sock_ioctl_doc},
