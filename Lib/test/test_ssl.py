@@ -2460,17 +2460,15 @@ class ThreadedEchoServer(threading.Thread):
                 self.server.shared_ciphers.append(self.sslconn.shared_ciphers())
                 if self.server.context.verify_mode == ssl.CERT_REQUIRED:
                     cert = self.sslconn.getpeercert()
-                    if support.verbose and self.server.chatty:
-                        sys.stdout.write(" client cert is " + pprint.pformat(cert) + "\n")
+                    self.log(f"client cert is {pprint.pformat(cert)}")
                     cert_binary = self.sslconn.getpeercert(True)
-                    if support.verbose and self.server.chatty:
-                        if cert_binary is None:
-                            sys.stdout.write(" client did not provide a cert\n")
-                        else:
-                            sys.stdout.write(f" cert binary is {len(cert_binary)}b\n")
+                    if cert_binary is None:
+                        message = "client did not provide a cert"
+                    else:
+                        message = f"cert binary is {len(cert_binary)}b"
+                    self.log(message)
                 cipher = self.sslconn.cipher()
-                if support.verbose and self.server.chatty:
-                    sys.stdout.write(" server: connection cipher is now " + str(cipher) + "\n")
+                self.log(f"connection cipher is now {cipher}")
                 return True
 
         def read(self):
@@ -2514,34 +2512,28 @@ class ThreadedEchoServer(threading.Thread):
                             self.sslconn = None
                         self.close()
                     elif stripped == b'over':
-                        if support.verbose and self.server.connectionchatty:
-                            sys.stdout.write(" server: client closed connection\n")
+                        self.log("client closed connection")
                         self.close()
                         return
                     elif (self.server.starttls_server and
                           stripped == b'STARTTLS'):
-                        if support.verbose and self.server.connectionchatty:
-                            sys.stdout.write(" server: read STARTTLS from client, sending OK...\n")
+                        self.log("read STARTTLS from client, sending OK")
                         self.write(b"OK\n")
                         if not self.wrap_conn():
                             return
                     elif (self.server.starttls_server and self.sslconn
                           and stripped == b'ENDTLS'):
-                        if support.verbose and self.server.connectionchatty:
-                            sys.stdout.write(" server: read ENDTLS from client, sending OK...\n")
+                        self.log("read ENDTLS from client, sending OK")
                         self.write(b"OK\n")
                         self.sock = self.sslconn.unwrap()
                         self.sslconn = None
-                        if support.verbose and self.server.connectionchatty:
-                            sys.stdout.write(" server: connection is now unencrypted...\n")
+                        self.log("connection is now unencrypted")
                     elif stripped == b'CB tls-unique':
-                        if support.verbose and self.server.connectionchatty:
-                            sys.stdout.write(" server: read CB tls-unique from client, sending our CB data...\n")
+                        self.log("read CB tls-unique from client, sending our CB data")
                         data = self.sslconn.get_channel_binding("tls-unique")
                         self.write(repr(data).encode("us-ascii") + b"\n")
                     elif stripped == b'PHA':
-                        if support.verbose and self.server.connectionchatty:
-                            sys.stdout.write(" server: initiating post handshake auth\n")
+                        self.log("initiating post handshake auth")
                         try:
                             self.sslconn.verify_client_post_handshake()
                         except ssl.SSLError as e:
@@ -2563,11 +2555,8 @@ class ThreadedEchoServer(threading.Thread):
                         certs = self.sslconn._sslobj.get_unverified_chain()
                         self.write(len(certs).to_bytes(1, "big") + b"\n")
                     else:
-                        if (support.verbose and
-                            self.server.connectionchatty):
-                            ctype = (self.sslconn and "encrypted") or "unencrypted"
-                            sys.stdout.write(" server: read %r (%s), sending back %r (%s)...\n"
-                                             % (msg, ctype, msg.lower(), ctype))
+                        ctype = "encrypted" if self.sslconn else "unencrypted"
+                        self.log(f"read {msg!r} ({ctype}), sending back {msg.lower()!r} ({ctype})")
                         self.write(msg.lower())
                 except OSError as e:
                     # handles SSLError and socket errors
@@ -2576,11 +2565,9 @@ class ThreadedEchoServer(threading.Thread):
                             # OpenSSL 1.1.1 sometimes raises
                             # ConnectionResetError when connection is not
                             # shut down gracefully.
-                            print(
-                                f" Connection reset by peer: {self.addr}"
-                            )
+                            self.log(f"connection reset by peer {self.addr}", always=True)
                         else:
-                            handle_error("Test server failure:\n")
+                            self.log("test server failure")
                     try:
                         self.write(b"ERROR\n")
                     except OSError:
@@ -2649,21 +2636,16 @@ class ThreadedEchoServer(threading.Thread):
         while self.active:
             try:
                 newconn, connaddr = self.sock.accept()
-                if support.verbose and self.chatty:
-                    sys.stdout.write(' server:  new connection from '
-                                     + repr(connaddr) + '\n')
+                self.log(f'new connection from {connaddr!r}')
                 handler = self.ConnectionHandler(self, newconn, connaddr, self.log)
                 handler.start()
                 handler.join()
             except TimeoutError as e:
-                if support.verbose:
-                    sys.stdout.write(f' connection timeout {e!r}\n')
+                self.log(f' connection timeout {e!r}', always=True)
             except KeyboardInterrupt:
                 self.stop()
             except BaseException as e:
-                if support.verbose and self.chatty:
-                    sys.stdout.write(
-                        ' connection handling failed: ' + repr(e) + '\n')
+                self.log(f'connection handling failed: {e!r}')
 
         self.close()
 
@@ -2679,17 +2661,22 @@ class AsyncoreEchoServer(threading.Thread):
 
     # this one's based on asyncore.dispatcher
 
+    def log(self, message):
+        if always or self.server.connectionchatty:
+            verbose_log("server", message)
+
     class EchoServer (asyncore.dispatcher):
 
         class ConnectionHandler(asyncore.dispatcher_with_send):
 
-            def __init__(self, conn, certfile):
+            def __init__(self, conn, certfile, log):
                 self.socket = test_wrap_socket(conn, server_side=True,
                                               certfile=certfile,
                                               do_handshake_on_connect=False)
                 asyncore.dispatcher_with_send.__init__(self, self.socket)
                 self._ssl_accepting = True
                 self._do_ssl_handshake()
+                self.log = log
 
             def readable(self):
                 if isinstance(self.socket, ssl.SSLSocket):
@@ -2717,8 +2704,7 @@ class AsyncoreEchoServer(threading.Thread):
                     self._do_ssl_handshake()
                 else:
                     data = self.recv(1024)
-                    if support.verbose:
-                        sys.stdout.write(" server:  read %s from client\n" % repr(data))
+                    self.log("read {data!r} from client")
                     if not data:
                         self.close()
                     else:
@@ -2726,8 +2712,7 @@ class AsyncoreEchoServer(threading.Thread):
 
             def handle_close(self):
                 self.close()
-                if support.verbose:
-                    sys.stdout.write(" server:  closed connection %s\n" % self.socket)
+                self.log(f"closed connection {self.socket}")
 
             def handle_error(self):
                 raise
@@ -2740,9 +2725,8 @@ class AsyncoreEchoServer(threading.Thread):
             self.listen(5)
 
         def handle_accepted(self, sock_obj, addr):
-            if support.verbose:
-                sys.stdout.write(" server:  new connection from %s:%s\n" %addr)
-            self.ConnectionHandler(sock_obj, self.certfile)
+            self.log(f"new connection from {addr}", always=True)
+            self.ConnectionHandler(sock_obj, self.certfile, self.log)
 
         def handle_error(self):
             raise
@@ -2764,14 +2748,11 @@ class AsyncoreEchoServer(threading.Thread):
         return self
 
     def __exit__(self, *args):
-        if support.verbose:
-            sys.stdout.write(" cleanup: stopping server.\n")
+        self.log("cleanup: stopping server", always=True)
         self.stop()
-        if support.verbose:
-            sys.stdout.write(" cleanup: joining server thread.\n")
+        self.log("cleanup: joining server thread", always=True)
         self.join()
-        if support.verbose:
-            sys.stdout.write(" cleanup: successfully joined.\n")
+        self.log("cleanup: successfully joined", always=True)
         # make sure that ConnectionHandler is removed from socket_map
         asyncore.close_all(ignore_all=True)
 
