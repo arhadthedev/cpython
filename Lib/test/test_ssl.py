@@ -260,10 +260,13 @@ def requires_tls_version(version):
     return decorator
 
 
-def handle_error(prefix):
-    exc_format = ' '.join(traceback.format_exception(*sys.exc_info()))
+def verbose_log(party, message):
     if support.verbose:
-        sys.stdout.write(prefix + exc_format)
+        if sys.exception():
+            sys.stdout.write(f" {party}: {message}. ")
+            traceback.print_exc()
+        else:
+            sys.stdout.write(f" {party}: {message}\n")
 
 
 def utc_offset(): #NOTE: ignore issues like #1647654
@@ -2400,13 +2403,17 @@ from test.ssl_servers import make_https_server
 
 class ThreadedEchoServer(threading.Thread):
 
+    def log(self, message, always=True):
+        if always:
+            verbose_log("server", message)
+
     class ConnectionHandler(threading.Thread):
 
         """A mildly complicated class, because we want it to work both
         with and without the SSL wrapper around the socket connection, so
         that we can test the STARTTLS functionality."""
 
-        def __init__(self, server, connsock, addr):
+        def __init__(self, server, connsock, addr, log):
             self.server = server
             self.running = False
             self.sock = connsock
@@ -2415,6 +2422,7 @@ class ThreadedEchoServer(threading.Thread):
             self.sslconn = None
             threading.Thread.__init__(self)
             self.daemon = True
+            self.log = log
 
         def wrap_conn(self):
             try:
@@ -2433,8 +2441,7 @@ class ThreadedEchoServer(threading.Thread):
                 # ConnectionAbortedError is raised in TLS 1.3 mode, when OpenSSL
                 # tries to send session tickets after handshake when using WinSock.
                 self.server.conn_errors.append(str(e))
-                if self.server.chatty:
-                    handle_error("\n server:  bad connection attempt from " + repr(self.addr) + ":\n")
+                self.log(f"bad connection attempt from {self.addr!r}", self.server.chatty)
                 self.running = False
                 self.close()
                 return False
@@ -2450,8 +2457,7 @@ class ThreadedEchoServer(threading.Thread):
                 # a reference leak: server -> conn_errors -> exception
                 # -> traceback -> self (ConnectionHandler) -> server
                 self.server.conn_errors.append(str(e))
-                if self.server.chatty:
-                    handle_error("\n server:  bad connection attempt from " + repr(self.addr) + ":\n")
+                self.log(f"bad connection attempt from {self.addr!r}", self.server.chatty)
 
                 # bpo-44229, bpo-43855, bpo-44237, and bpo-33450:
                 # Ignore spurious EPROTOTYPE returned by write() on macOS.
@@ -2657,7 +2663,7 @@ class ThreadedEchoServer(threading.Thread):
                 if support.verbose and self.chatty:
                     sys.stdout.write(' server:  new connection from '
                                      + repr(connaddr) + '\n')
-                handler = self.ConnectionHandler(self, newconn, connaddr)
+                handler = self.ConnectionHandler(self, newconn, connaddr, self.log)
                 handler.start()
                 handler.join()
             except TimeoutError as e:
