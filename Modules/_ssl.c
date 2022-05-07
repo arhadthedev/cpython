@@ -4209,7 +4209,8 @@ _ssl._SSLContext._wrap_bio
     incoming: object(subclass_of="get_state_ctx(self)->PySSLMemoryBIO_Type", type="PySSLMemoryBIO *")
     outgoing: object(subclass_of="get_state_ctx(self)->PySSLMemoryBIO_Type", type="PySSLMemoryBIO *")
     server_side: int
-    server_hostname as hostname_obj: object = None
+    server_hostname as hostname: str(encoding='ascii') = None
+        None for absent, or IDN A-label (ASCII str) without NULL bytes.
     *
     owner: object = None
     session: object = None
@@ -4219,26 +4220,13 @@ _ssl._SSLContext._wrap_bio
 static PyObject *
 _ssl__SSLContext__wrap_bio_impl(PySSLContext *self, PySSLMemoryBIO *incoming,
                                 PySSLMemoryBIO *outgoing, int server_side,
-                                PyObject *hostname_obj, PyObject *owner,
+                                char *hostname, PyObject *owner,
                                 PyObject *session)
-/*[clinic end generated code: output=5c5d6d9b41f99332 input=331edeec9c738382]*/
+/*[clinic end generated code: output=405ec9324798e048 input=0ebcede7bdb7ec7a]*/
 {
-    char *hostname = NULL;
-    PyObject *res;
-
-    /* server_hostname is either None (or absent), or to be encoded
-       as IDN A-label (ASCII str) without NULL bytes. */
-    if (hostname_obj != Py_None) {
-        if (!PyArg_Parse(hostname_obj, "es", "ascii", &hostname))
-            return NULL;
-    }
-
-    res = (PyObject *) newPySSLSocket(self, NULL, server_side, hostname,
-                                      owner, session,
-                                      incoming, outgoing);
-
-    PyMem_Free(hostname);
-    return res;
+    return (PyObject *) newPySSLSocket(self, NULL, server_side, hostname,
+                                       owner, session,
+                                       incoming, outgoing);
 }
 
 /*[clinic input]
