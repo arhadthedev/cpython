@@ -626,14 +626,18 @@ PyDoc_STRVAR(_ssl__SSLContext__wrap_socket__doc__,
 "_wrap_socket($self, /, sock, server_side, server_hostname=None, *,\n"
 "             owner=None, session=None)\n"
 "--\n"
-"\n");
+"\n"
+"\n"
+"\n"
+"  server_hostname\n"
+"    None for absent, or IDN A-label (ASCII str) without NULL bytes.");
 
 #define _SSL__SSLCONTEXT__WRAP_SOCKET_METHODDEF    \
     {"_wrap_socket", _PyCFunction_CAST(_ssl__SSLContext__wrap_socket), METH_FASTCALL|METH_KEYWORDS, _ssl__SSLContext__wrap_socket__doc__},
 
 static PyObject *
 _ssl__SSLContext__wrap_socket_impl(PySSLContext *self, PyObject *sock,
-                                   int server_side, PyObject *hostname_obj,
+                                   int server_side, char *hostname,
                                    PyObject *owner, PyObject *session);
 
 static PyObject *
@@ -641,52 +645,25 @@ _ssl__SSLContext__wrap_socket(PySSLContext *self, PyObject *const *args, Py_ssiz
 {
     PyObject *return_value = NULL;
     static const char * const _keywords[] = {"sock", "server_side", "server_hostname", "owner", "session", NULL};
-    static _PyArg_Parser _parser = {NULL, _keywords, "_wrap_socket", 0};
-    PyObject *argsbuf[5];
-    Py_ssize_t noptargs = nargs + (kwnames ? PyTuple_GET_SIZE(kwnames) : 0) - 2;
+    static _PyArg_Parser _parser = {"O!i|es$OO:_wrap_socket", _keywords, 0};
     PyObject *sock;
     int server_side;
-    PyObject *hostname_obj = Py_None;
+    char *hostname = NULL;
     PyObject *owner = Py_None;
     PyObject *session = Py_None;
 
-    args = _PyArg_UnpackKeywords(args, nargs, NULL, kwnames, &_parser, 2, 3, 0, argsbuf);
-    if (!args) {
+    if (!_PyArg_ParseStackAndKeywords(args, nargs, kwnames, &_parser,
+        get_state_ctx(self)->Sock_Type, &sock, &server_side, "ascii", &hostname, &owner, &session)) {
         goto exit;
     }
-    if (!PyObject_TypeCheck(args[0], get_state_ctx(self)->Sock_Type)) {
-        _PyArg_BadArgument("_wrap_socket", "argument 'sock'", (get_state_ctx(self)->Sock_Type)->tp_name, args[0]);
-        goto exit;
-    }
-    sock = args[0];
-    server_side = _PyLong_AsInt(args[1]);
-    if (server_side == -1 && PyErr_Occurred()) {
-        goto exit;
-    }
-    if (!noptargs) {
-        goto skip_optional_pos;
-    }
-    if (args[2]) {
-        hostname_obj = args[2];
-        if (!--noptargs) {
-            goto skip_optional_pos;
-        }
-    }
-skip_optional_pos:
-    if (!noptargs) {
-        goto skip_optional_kwonly;
-    }
-    if (args[3]) {
-        owner = args[3];
-        if (!--noptargs) {
-            goto skip_optional_kwonly;
-        }
-    }
-    session = args[4];
-skip_optional_kwonly:
-    return_value = _ssl__SSLContext__wrap_socket_impl(self, sock, server_side, hostname_obj, owner, session);
+    return_value = _ssl__SSLContext__wrap_socket_impl(self, sock, server_side, hostname, owner, session);
 
 exit:
+    /* Cleanup for hostname */
+    if (hostname) {
+       PyMem_FREE(hostname);
+    }
+
     return return_value;
 }
 
@@ -1361,4 +1338,4 @@ exit:
 #ifndef _SSL_ENUM_CRLS_METHODDEF
     #define _SSL_ENUM_CRLS_METHODDEF
 #endif /* !defined(_SSL_ENUM_CRLS_METHODDEF) */
-/*[clinic end generated code: output=2a488dd0cbc777df input=a9049054013a1b77]*/
+/*[clinic end generated code: output=21ab458130a3f4dc input=a9049054013a1b77]*/

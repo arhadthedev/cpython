@@ -4184,7 +4184,8 @@ _ssl__SSLContext_load_dh_params(PySSLContext *self, PyObject *filepath)
 _ssl._SSLContext._wrap_socket
     sock: object(subclass_of="get_state_ctx(self)->Sock_Type")
     server_side: int
-    server_hostname as hostname_obj: object = None
+    server_hostname as hostname: str(encoding='ascii') = None
+        None for absent, or IDN A-label (ASCII str) without NULL bytes.
     *
     owner: object = None
     session: object = None
@@ -4193,27 +4194,14 @@ _ssl._SSLContext._wrap_socket
 
 static PyObject *
 _ssl__SSLContext__wrap_socket_impl(PySSLContext *self, PyObject *sock,
-                                   int server_side, PyObject *hostname_obj,
+                                   int server_side, char *hostname,
                                    PyObject *owner, PyObject *session)
-/*[clinic end generated code: output=f103f238633940b4 input=f5916eadbc6eae81]*/
+/*[clinic end generated code: output=2f9dbdf1f1916f01 input=f8c4929c02d5d12d]*/
 {
-    char *hostname = NULL;
-    PyObject *res;
-
-    /* server_hostname is either None (or absent), or to be encoded
-       as IDN A-label (ASCII str) without NULL bytes. */
-    if (hostname_obj != Py_None) {
-        if (!PyArg_Parse(hostname_obj, "es", "ascii", &hostname))
-            return NULL;
-    }
-
-    res = (PyObject *) newPySSLSocket(self, (PySocketSockObject *)sock,
-                                      server_side, hostname,
-                                      owner, session,
-                                      NULL, NULL);
-    if (hostname != NULL)
-        PyMem_Free(hostname);
-    return res;
+    return (PyObject *) newPySSLSocket(self, (PySocketSockObject *)sock,
+                                       server_side, hostname,
+                                       owner, session,
+                                       NULL, NULL);
 }
 
 /*[clinic input]
