@@ -385,6 +385,14 @@ class AbstractEventLoop:
         """
         raise NotImplementedError
 
+    async def shutdown_tls(self, transport, protocol):
+        """Downgrade a transport to plain text.
+
+        Return a new transport that *protocol* should start using
+        immediately.
+        """
+        raise NotImplementedError
+
     async def create_unix_connection(
             self, protocol_factory, path=None, *,
             ssl=None, sock=None,

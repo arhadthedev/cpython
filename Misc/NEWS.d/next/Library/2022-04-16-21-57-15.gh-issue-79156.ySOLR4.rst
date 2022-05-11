@@ -1,0 +1,2 @@
+Add :meth:`asyncio.loop.shutdown_tls` to complement
+:meth:`asyncio.loop.start_tls`. Patch by Oleg Iarygin.

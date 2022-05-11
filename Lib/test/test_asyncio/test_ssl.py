@@ -686,6 +686,7 @@ class TestSSL(test_utils.TestCase):
                 self.on_data = on_data
                 self.on_eof = on_eof
                 self.con_made_cnt = 0
+                self.data_cnt = 0
 
             def connection_made(proto, tr):
                 proto.con_made_cnt += 1
@@ -693,7 +694,8 @@ class TestSSL(test_utils.TestCase):
                 self.assertEqual(proto.con_made_cnt, 1)
 
             def data_received(self, data):
-                self.on_data.set_result(data)
+                self.data_cnt += 1
+                self.on_data[self.data_cnt].set_result(data)
 
             def eof_received(self):
                 self.on_eof.set_result(True)
@@ -701,25 +703,34 @@ class TestSSL(test_utils.TestCase):
         async def client(addr):
             await asyncio.sleep(0.5)
 
-            on_data = self.loop.create_future()
+            on_data = [self.loop.create_future() for i in range(2)]
             on_eof = self.loop.create_future()
 
             tr, proto = await self.loop.create_connection(
                 lambda: ClientProto(on_data, on_eof), *addr)
 
             tr.write(HELLO_MSG)
-            new_tr = await self.loop.start_tls(tr, proto, client_context)
 
-            self.assertEqual(await on_data, b'O')
+            new_tr = await self.loop.start_tls(tr, proto, client_context)
+            self.assertEqual(await on_data[0], b'O')
             new_tr.write(HELLO_MSG)
+
+            restored_tr = await self.loop.shutdown_tls(new_tr, proto)
+            self.assertEqual(await on_data[1], b'H')
+            restored_tr.write(HELLO_MSG)
             await on_eof
 
-            new_tr.close()
+            new_tr[0].close()
+            new_tr[1].close()
+            restored_tr.close()
 
         with self.tcp_server(serve, timeout=self.TIMEOUT) as srv:
             self.loop.run_until_complete(
                 asyncio.wait_for(client(srv.addr),
                                  timeout=support.SHORT_TIMEOUT))
+
+    def test_shutdown_tls_client_reg_proto_1(self):
+        pass
 
     def test_create_connection_memory_leak(self):
         HELLO_MSG = b'1' * self.PAYLOAD_SIZE
@@ -814,6 +825,7 @@ class TestSSL(test_utils.TestCase):
 
         class ClientProtoFirst(asyncio.BufferedProtocol):
             def __init__(self, on_data):
+                # on_data is a list of received batches
                 self.on_data = on_data
                 self.buf = bytearray(1)
 
@@ -941,6 +953,8 @@ class TestSSL(test_utils.TestCase):
                 asyncio.wait_for(client(srv.addr),
                                  timeout=support.SHORT_TIMEOUT))
 
+    def test_shutdown_tls_slow_client_cancel(self):
+
     def test_start_tls_server_1(self):
         HELLO_MSG = b'1' * self.PAYLOAD_SIZE
 
@@ -1018,6 +1032,8 @@ class TestSSL(test_utils.TestCase):
             await server.wait_closed()
 
         self.loop.run_until_complete(run_main())
+
+    def test_shutdown_tls_server_1(self):
 
     def test_create_server_ssl_over_ssl(self):
         CNT = 0           # number of clients that were successful

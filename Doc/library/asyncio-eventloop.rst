@@ -863,6 +863,23 @@ TLS Upgrade
       Added the *ssl_shutdown_timeout* parameter.
 
 
+.. coroutinemethod:: loop.shutdown_tls(transport, protocol)
+
+   Manually downgrade an existing transport-based connection to plain text.
+   The downgrade must be preliminary agreed with a peer so it can get its raw
+   socket by already a no-op call to :meth:~asyncio.loop.shutdown_tls`.
+
+   Return a new transport instance, that the *protocol* must start using
+   immediately after the *await*.  The *transport* instance passed to
+   the *start_tls* method should never be used again.
+
+   * *transport* and *protocol* instances that methods like
+     :meth:`~loop.create_server` and
+     :meth:`~loop.create_connection` return.
+
+   .. versionadded:: 3.11
+
+
 
 Watching file descriptors
 ^^^^^^^^^^^^^^^^^^^^^^^^^

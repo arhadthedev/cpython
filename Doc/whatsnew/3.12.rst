@@ -93,6 +93,12 @@ New Modules
 Improved Modules
 ================
 
+asyncio
+-------
+
+* Add :meth:`asyncio.loop.shutdown_tls` method to complement
+:meth:`asyncio.loop.start_tls`. (Contributed by Oleg Iarygin in :gh:`79156`.)
+
 dis
 ---
 

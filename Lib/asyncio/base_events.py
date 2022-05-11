@@ -1259,6 +1259,25 @@ class BaseEventLoop(events.AbstractEventLoop):
 
         return ssl_protocol._app_transport
 
+    async def shutdown_tls(self, transport, protocol):
+        """Downgrade transport to plain text.
+
+        Return a new transport that *protocol* should start using
+        immediately.
+        """
+        ssl_proto = transport._ssl_protocol
+        if not isinstance(ssl_proto, sslproto.SSLProtocol):
+            raise TypeError(
+                f'protocol bound to transport is expected to be an instance '
+                f'of asyncio.sslproto.SSLProtocol, got {protocol!r}')
+
+        # Calling pause_reading()+eof_received() causes the wrapped transport
+        # to stay open.
+        transport.pause_reading()
+        ssl_proto.eof_received()
+        plain_transport = ssl_proto._get_app_transport()
+        return plain_transport
+
     async def create_datagram_endpoint(self, protocol_factory,
                                        local_addr=None, remote_addr=None, *,
                                        family=0, proto=0, flags=0,
