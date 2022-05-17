@@ -23,6 +23,7 @@ import logging
 import logging.handlers
 import logging.config
 
+from asyncio import start_server
 import codecs
 import configparser
 import copy
@@ -60,11 +61,6 @@ from urllib.parse import urlparse, parse_qs
 from socketserver import (ThreadingUDPServer, DatagramRequestHandler,
                           ThreadingTCPServer, StreamRequestHandler)
 
-
-asyncore = warnings_helper.import_deprecated('asyncore')
-smtpd = warnings_helper.import_deprecated('smtpd')
-
-
 try:
     import win32evtlog, win32evtlogutil, pywintypes
 except ImportError:
@@ -76,7 +72,7 @@ except ImportError:
     pass
 
 
-class BaseTest(unittest.TestCase):
+class BaseTest(unittest.IsolatedAsyncioTestCase):
 
     """Base class for logging tests."""
 
@@ -812,80 +808,6 @@ class StreamHandlerTest(BaseTest):
 # -- The following section could be moved into a server_helper.py module
 # -- if it proves to be of wider utility than just test_logging
 
-class TestSMTPServer(smtpd.SMTPServer):
-    """
-    This class implements a test SMTP server.
-
-    :param addr: A (host, port) tuple which the server listens on.
-                 You can specify a port value of zero: the server's
-                 *port* attribute will hold the actual port number
-                 used, which can be used in client connections.
-    :param handler: A callable which will be called to process
-                    incoming messages. The handler will be passed
-                    the client address tuple, who the message is from,
-                    a list of recipients and the message data.
-    :param poll_interval: The interval, in seconds, used in the underlying
-                          :func:`select` or :func:`poll` call by
-                          :func:`asyncore.loop`.
-    :param sockmap: A dictionary which will be used to hold
-                    :class:`asyncore.dispatcher` instances used by
-                    :func:`asyncore.loop`. This avoids changing the
-                    :mod:`asyncore` module's global state.
-    """
-
-    def __init__(self, addr, handler, poll_interval, sockmap):
-        smtpd.SMTPServer.__init__(self, addr, None, map=sockmap,
-                                  decode_data=True)
-        self.port = self.socket.getsockname()[1]
-        self._handler = handler
-        self._thread = None
-        self._quit = False
-        self.poll_interval = poll_interval
-
-    def process_message(self, peer, mailfrom, rcpttos, data):
-        """
-        Delegates to the handler passed in to the server's constructor.
-
-        Typically, this will be a test case method.
-        :param peer: The client (host, port) tuple.
-        :param mailfrom: The address of the sender.
-        :param rcpttos: The addresses of the recipients.
-        :param data: The message.
-        """
-        self._handler(peer, mailfrom, rcpttos, data)
-
-    def start(self):
-        """
-        Start the server running on a separate daemon thread.
-        """
-        self._thread = t = threading.Thread(target=self.serve_forever,
-                                            args=(self.poll_interval,))
-        t.daemon = True
-        t.start()
-
-    def serve_forever(self, poll_interval):
-        """
-        Run the :mod:`asyncore` loop until normal termination
-        conditions arise.
-        :param poll_interval: The interval, in seconds, used in the underlying
-                              :func:`select` or :func:`poll` call by
-                              :func:`asyncore.loop`.
-        """
-        while not self._quit:
-            asyncore.loop(poll_interval, map=self._map, count=1)
-
-    def stop(self):
-        """
-        Stop the thread by closing the server instance.
-        Wait for the server thread to terminate.
-        """
-        self._quit = True
-        threading_helper.join_thread(self._thread)
-        self._thread = None
-        self.close()
-        asyncore.close_all(map=self._map, ignore_all=True)
-
-
 class ControlMixin(object):
     """
     This mixin is used to start a server on a separate thread, and
@@ -1065,19 +987,21 @@ if hasattr(socket, "AF_UNIX"):
 # - end of server_helper section
 
 @support.requires_working_socket()
-@threading_helper.requires_working_threading()
 class SMTPHandlerTest(BaseTest):
     # bpo-14314, bpo-19665, bpo-34092: don't wait forever
     TIMEOUT = support.LONG_TIMEOUT
 
-    def test_basic(self):
+    def on_smtp_client(self, reader, writer):
+        with writer:
+            при получении сообщения:
+                self.process_message(peer, mailfrom, rcpttos, data)
+
+    async def test_basic(self):
         sockmap = {}
-        server = TestSMTPServer((socket_helper.HOST, 0), self.process_message, 0.001,
-                                sockmap)
-        server.start()
+        server = start_server(self.on_smtp_client)
         addr = (socket_helper.HOST, server.port)
         h = logging.handlers.SMTPHandler(addr, 'me', 'you', 'Log',
-                                         timeout=self.TIMEOUT)
+                                         timeout=self.TIMEOUT) ------------------ тоже требует эталонного сервера в отдельном потоке
         self.assertEqual(h.toaddrs, ['you'])
         self.messages = []
         r = logging.makeLogRecord({'msg': 'Hello \u2713'})
