@@ -2507,15 +2507,6 @@ class ThreadedEchoServer(threading.Thread):
                     if not stripped:
                         # eof, so quit this handler
                         self.running = False
-                        try:
-                            self.sock = self.sslconn.unwrap()
-                        except OSError:
-                            # Many tests shut the TCP connection down
-                            # without an SSL shutdown. This causes
-                            # unwrap() to raise OSError with errno=0!
-                            pass
-                        else:
-                            self.sslconn = None
                         self.close()
                     elif stripped == b'over':
                         if support.verbose and self.server.connectionchatty:
