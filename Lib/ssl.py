@@ -1322,8 +1322,15 @@ class SSLSocket(socket):
             # final stage (session ticket sending) until some data are sent.
             # As a result, to close a freshly opened TLS socket without
             # infinite hanging, at least an empty packet needs to be pushed.
+            #
+            # Another issue is a possible non-SSL peer that causes the first
+            # write to wait indefinetly for the handshake. It is mitigated with
+            # a socket timeout.
+            original_timeout = self.gettimeout()
+            self.settimeout(1)
             self._sslobj.write(b'')
             self._sslobj.shutdown()
+            self.settimeout(original_timeout)
         except:
             # Do nothing if:
             # - a session is not started yet (handshake is in progress) or
