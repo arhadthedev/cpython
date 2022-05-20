@@ -2925,6 +2925,105 @@ def try_protocol_combo(server_protocol, client_protocol, expect_success,
 
 class ThreadedTests(unittest.TestCase):
 
+    def test_shutdown_after_close(self):
+        client_context, server_context, hostname = testing_context()
+        server = ThreadedEchoServer(context=server_context, chatty=True)
+        with server:
+            with client_context.wrap_socket(socket.socket(),
+                                            do_handshake_on_connect=False,
+                                            server_hostname=hostname) as s:
+                s.connect((HOST, server.port))
+                s.close()
+                s.shutdown(socket.SHUT_WR)
+                s.close()
+
+        server = ThreadedEchoServer(context=server_context, chatty=True)
+        with server:
+            with client_context.wrap_socket(socket.socket(),
+                                            do_handshake_on_connect=False,
+                                            server_hostname=hostname) as s:
+                s.connect((HOST, server.port))
+                s.send(b'')
+                s.close()
+                s.shutdown(socket.SHUT_WR)
+                s.close()
+
+    def test_shutdown_after_doulbe_close(self):
+        client_context, server_context, hostname = testing_context()
+        server = ThreadedEchoServer(context=server_context, chatty=True)
+        with server:
+            with client_context.wrap_socket(socket.socket(),
+                                            do_handshake_on_connect=False,
+                                            server_hostname=hostname) as s:
+                s.connect((HOST, server.port))
+                # A server raises an exception here because we close a socket
+                # before the session is properly established
+                s.close()
+                s.close()
+                s.shutdown(socket.SHUT_WR)
+                s.close()
+
+        server = ThreadedEchoServer(context=server_context, chatty=True)
+        with server:
+            with client_context.wrap_socket(socket.socket(),
+                                            do_handshake_on_connect=False,
+                                            server_hostname=hostname) as s:
+                s.connect((HOST, server.port))
+                s.write(b'')
+                s.close()
+                s.close()
+                s.shutdown(socket.SHUT_WR)
+                s.close()
+
+    def test_close_after_shutdown(self):
+        client_context, server_context, hostname = testing_context()
+        server = ThreadedEchoServer(context=server_context, chatty=True)
+        with server:
+            with client_context.wrap_socket(socket.socket(),
+                                            do_handshake_on_connect=False,
+                                            server_hostname=hostname) as s:
+                s.connect((HOST, server.port))
+                # A server raises an exception here because we close a socket
+                # before the session is properly established
+                s.shutdown(socket.SHUT_WR)
+                s.close()
+
+        server = ThreadedEchoServer(context=server_context, chatty=True)
+        with server:
+            with client_context.wrap_socket(socket.socket(),
+                                            do_handshake_on_connect=False,
+                                            server_hostname=hostname) as s:
+                s.connect((HOST, server.port))
+                s.write(b'')
+                s.shutdown(socket.SHUT_WR)
+                s.close()
+
+
+    def test_double_close_after_shutdown(self):
+        client_context, server_context, hostname = testing_context()
+        server = ThreadedEchoServer(context=server_context, chatty=True)
+        with server:
+            with client_context.wrap_socket(socket.socket(),
+                                            do_handshake_on_connect=False,
+                                            server_hostname=hostname) as s:
+                s.connect((HOST, server.port))
+                # A server raises an exception here because we close a socket
+                # before the session is properly established
+                s.shutdown(socket.SHUT_WR)
+                s.close()
+                s.close()
+
+        server = ThreadedEchoServer(context=server_context, chatty=True)
+        with server:
+            with client_context.wrap_socket(socket.socket(),
+                                            do_handshake_on_connect=False,
+                                            server_hostname=hostname) as s:
+                s.connect((HOST, server.port))
+                s.write(b'')
+                s.shutdown(socket.SHUT_WR)
+                s.close()
+                s.close()
+
     def test_echo(self):
         """Basic test of an SSL client connecting to a server"""
         if support.verbose:

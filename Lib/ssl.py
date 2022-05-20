@@ -1316,6 +1316,23 @@ class SSLSocket(socket):
         self._sslobj = None
         super().shutdown(how)
 
+    def close(self):
+        try:
+            # TLS 1.3 and possibly some other protocols postpone the handshake
+            # final stage (session ticket sending) until some data are sent.
+            # As a result, to close a freshly opened TLS socket without
+            # infinite hanging, at least an empty packet needs to be pushed.
+            self._sslobj.write(b'')
+            self._sslobj.shutdown()
+        except:
+            # Do nothing if:
+            # - a session is not started yet (handshake is in progress) or
+            # - a session is already shut down or a socket is closed (in
+            #   this case ``super().close()`` will raise proper exceptions)
+            pass
+        self._sslobj = None
+        super().close()
+
     @_sslcopydoc
     def unwrap(self):
         if self._sslobj:
