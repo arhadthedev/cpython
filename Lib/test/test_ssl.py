@@ -5,6 +5,7 @@ import unittest
 import unittest.mock
 from test import support
 from test.support import import_helper
+from test.support import logging_helper
 from test.support import os_helper
 from test.support import socket_helper
 from test.support import threading_helper

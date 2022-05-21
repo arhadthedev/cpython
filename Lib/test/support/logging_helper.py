@@ -1,4 +1,6 @@
 import logging.handlers
+from  test import support
+from sys import stdout
 
 class TestHandler(logging.handlers.BufferingHandler):
     def __init__(self, matcher):
@@ -27,3 +29,18 @@ class TestHandler(logging.handlers.BufferingHandler):
                 result = True
                 break
         return result
+
+
+def verbose(func):
+    """A decorator providing a logging function for tests."""
+    def wrapper(*args, **kwargs):
+        if support.verbose:
+            stdout.write('\n')
+
+        def log(message, role=None):
+            if support.verbose:
+                prefix = f' {role}: ' if role else ''
+                stdout.write(f'{prefix}{message}\n')
+        return func(*args, log=log, **kwargs)
+
+    return wrapper
