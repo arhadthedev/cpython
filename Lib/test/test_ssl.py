@@ -2926,11 +2926,9 @@ def try_protocol_combo(server_protocol, client_protocol, expect_success,
 
 class ThreadedTests(unittest.TestCase):
 
-    def test_echo(self):
+    @logging_helper.verbose
+    def test_echo(self, log):
         """Basic test of an SSL client connecting to a server"""
-        if support.verbose:
-            sys.stdout.write("\n")
-
         client_context, server_context, hostname = testing_context()
 
         with self.subTest(client=ssl.PROTOCOL_TLS_CLIENT, server=ssl.PROTOCOL_TLS_SERVER):
@@ -2970,10 +2968,8 @@ class ThreadedTests(unittest.TestCase):
                 'Cannot create a client socket with a PROTOCOL_TLS_SERVER context',
                 str(e.exception))
 
-    def test_getpeercert(self):
-        if support.verbose:
-            sys.stdout.write("\n")
-
+    @logging_helper.verbose
+    def test_getpeercert(self, log):
         client_context, server_context, hostname = testing_context()
         server = ThreadedEchoServer(context=server_context, chatty=False)
         with server:
@@ -3006,10 +3002,8 @@ class ThreadedTests(unittest.TestCase):
                 after = ssl.cert_time_to_seconds(cert['notAfter'])
                 self.assertLess(before, after)
 
-    def test_crl_check(self):
-        if support.verbose:
-            sys.stdout.write("\n")
-
+    @logging_helper.verbose
+    def test_crl_check(self, log):
         client_context, server_context, hostname = testing_context()
 
         tf = getattr(ssl, "VERIFY_X509_TRUSTED_FIRST", 0)
@@ -3046,10 +3040,8 @@ class ThreadedTests(unittest.TestCase):
                 cert = s.getpeercert()
                 self.assertTrue(cert, "Can't get peer certificate.")
 
-    def test_check_hostname(self):
-        if support.verbose:
-            sys.stdout.write("\n")
-
+    @logging_helper.verbose
+    def test_check_hostname(self, log):
         client_context, server_context, hostname = testing_context()
 
         # correct hostname should verify
@@ -3150,10 +3142,8 @@ class ThreadedTests(unittest.TestCase):
                 cipher = s.cipher()[0].split('-')
                 self.assertTrue(cipher[:2], ('ECDHE', 'ECDSA'))
 
-    def test_check_hostname_idn(self):
-        if support.verbose:
-            sys.stdout.write("\n")
-
+    @logging_helper.verbose
+    def test_check_hostname_idn(self, log):
         server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         server_context.load_cert_chain(IDNSANSFILE)
 
@@ -3311,10 +3301,8 @@ class ThreadedTests(unittest.TestCase):
         finally:
             t.join()
 
-    def test_ssl_cert_verify_error(self):
-        if support.verbose:
-            sys.stdout.write("\n")
-
+    @logging_helper.verbose
+    def test_ssl_cert_verify_error(self, log):
         server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         server_context.load_cert_chain(SIGNED_CERTFILE)
 
@@ -3334,11 +3322,10 @@ class ThreadedTests(unittest.TestCase):
                     self.assertIn(msg, repr(e))
                     self.assertIn('certificate verify failed', repr(e))
 
+    @logging_helper.verbose
     @requires_tls_version('SSLv2')
-    def test_protocol_sslv2(self):
+    def test_protocol_sslv2(self, log):
         """Connecting to an SSLv2 server with various client options"""
-        if support.verbose:
-            sys.stdout.write("\n")
         try_protocol_combo(ssl.PROTOCOL_SSLv2, ssl.PROTOCOL_SSLv2, True)
         try_protocol_combo(ssl.PROTOCOL_SSLv2, ssl.PROTOCOL_SSLv2, True, ssl.CERT_OPTIONAL)
         try_protocol_combo(ssl.PROTOCOL_SSLv2, ssl.PROTOCOL_SSLv2, True, ssl.CERT_REQUIRED)
@@ -3352,10 +3339,9 @@ class ThreadedTests(unittest.TestCase):
         try_protocol_combo(ssl.PROTOCOL_SSLv2, ssl.PROTOCOL_TLS, False,
                            client_options=ssl.OP_NO_TLSv1)
 
-    def test_PROTOCOL_TLS(self):
+    @logging_helper.verbose
+    def test_PROTOCOL_TLS(self, log):
         """Connecting to an SSLv23 server with various client options"""
-        if support.verbose:
-            sys.stdout.write("\n")
         if has_tls_version('SSLv2'):
             try:
                 try_protocol_combo(ssl.PROTOCOL_TLS, ssl.PROTOCOL_SSLv2, True)
@@ -3394,11 +3380,10 @@ class ThreadedTests(unittest.TestCase):
             try_protocol_combo(ssl.PROTOCOL_TLS, ssl.PROTOCOL_TLSv1, False,
                                server_options=ssl.OP_NO_TLSv1)
 
+    @logging_helper.verbose
     @requires_tls_version('SSLv3')
-    def test_protocol_sslv3(self):
+    def test_protocol_sslv3(self, log):
         """Connecting to an SSLv3 server with various client options"""
-        if support.verbose:
-            sys.stdout.write("\n")
         try_protocol_combo(ssl.PROTOCOL_SSLv3, ssl.PROTOCOL_SSLv3, 'SSLv3')
         try_protocol_combo(ssl.PROTOCOL_SSLv3, ssl.PROTOCOL_SSLv3, 'SSLv3', ssl.CERT_OPTIONAL)
         try_protocol_combo(ssl.PROTOCOL_SSLv3, ssl.PROTOCOL_SSLv3, 'SSLv3', ssl.CERT_REQUIRED)
@@ -3408,11 +3393,10 @@ class ThreadedTests(unittest.TestCase):
                            client_options=ssl.OP_NO_SSLv3)
         try_protocol_combo(ssl.PROTOCOL_SSLv3, ssl.PROTOCOL_TLSv1, False)
 
+    @logging_helper.verbose
     @requires_tls_version('TLSv1')
-    def test_protocol_tlsv1(self):
+    def test_protocol_tlsv1(self, log):
         """Connecting to a TLSv1 server with various client options"""
-        if support.verbose:
-            sys.stdout.write("\n")
         try_protocol_combo(ssl.PROTOCOL_TLSv1, ssl.PROTOCOL_TLSv1, 'TLSv1')
         try_protocol_combo(ssl.PROTOCOL_TLSv1, ssl.PROTOCOL_TLSv1, 'TLSv1', ssl.CERT_OPTIONAL)
         try_protocol_combo(ssl.PROTOCOL_TLSv1, ssl.PROTOCOL_TLSv1, 'TLSv1', ssl.CERT_REQUIRED)
@@ -3423,12 +3407,11 @@ class ThreadedTests(unittest.TestCase):
         try_protocol_combo(ssl.PROTOCOL_TLSv1, ssl.PROTOCOL_TLS, False,
                            client_options=ssl.OP_NO_TLSv1)
 
+    @logging_helper.verbose
     @requires_tls_version('TLSv1_1')
-    def test_protocol_tlsv1_1(self):
+    def test_protocol_tlsv1_1(self, log):
         """Connecting to a TLSv1.1 server with various client options.
            Testing against older TLS versions."""
-        if support.verbose:
-            sys.stdout.write("\n")
         try_protocol_combo(ssl.PROTOCOL_TLSv1_1, ssl.PROTOCOL_TLSv1_1, 'TLSv1.1')
         if has_tls_version('SSLv2'):
             try_protocol_combo(ssl.PROTOCOL_TLSv1_1, ssl.PROTOCOL_SSLv2, False)
@@ -3441,12 +3424,11 @@ class ThreadedTests(unittest.TestCase):
         try_protocol_combo(ssl.PROTOCOL_TLSv1_1, ssl.PROTOCOL_TLSv1_2, False)
         try_protocol_combo(ssl.PROTOCOL_TLSv1_2, ssl.PROTOCOL_TLSv1_1, False)
 
+    @logging_helper.verbose
     @requires_tls_version('TLSv1_2')
-    def test_protocol_tlsv1_2(self):
+    def test_protocol_tlsv1_2(self, log):
         """Connecting to a TLSv1.2 server with various client options.
            Testing against older TLS versions."""
-        if support.verbose:
-            sys.stdout.write("\n")
         try_protocol_combo(ssl.PROTOCOL_TLSv1_2, ssl.PROTOCOL_TLSv1_2, 'TLSv1.2',
                            server_options=ssl.OP_NO_SSLv3|ssl.OP_NO_SSLv2,
                            client_options=ssl.OP_NO_SSLv3|ssl.OP_NO_SSLv2,)
@@ -3463,7 +3445,8 @@ class ThreadedTests(unittest.TestCase):
         try_protocol_combo(ssl.PROTOCOL_TLSv1_2, ssl.PROTOCOL_TLSv1_1, False)
         try_protocol_combo(ssl.PROTOCOL_TLSv1_1, ssl.PROTOCOL_TLSv1_2, False)
 
-    def test_starttls(self):
+    @logging_helper.verbose
+    def test_starttls(self, log):
         """Switching from clear text to encrypted and back again."""
         msgs = (b"msg 1", b"MSG 2", b"STARTTLS", b"MSG 3", b"msg 4", b"ENDTLS", b"msg 5", b"msg 6")
 
@@ -3476,8 +3459,6 @@ class ThreadedTests(unittest.TestCase):
             s = socket.socket()
             s.setblocking(True)
             s.connect((HOST, server.port))
-            if support.verbose:
-                sys.stdout.write("\n")
             for indata in msgs:
                 if support.verbose:
                     sys.stdout.write(
@@ -3520,12 +3501,11 @@ class ThreadedTests(unittest.TestCase):
             else:
                 s.close()
 
-    def test_socketserver(self):
+    @logging_helper.verbose
+    def test_socketserver(self, log):
         """Using socketserver to create and manage SSL connections."""
         server = make_https_server(self, certfile=SIGNED_CERTFILE)
         # try to connect
-        if support.verbose:
-            sys.stdout.write('\n')
         with open(CERTFILE, 'rb') as f:
             d1 = f.read()
         d2 = ''
@@ -3546,11 +3526,9 @@ class ThreadedTests(unittest.TestCase):
             f.close()
         self.assertEqual(d1, d2)
 
-    def test_asyncore_server(self):
+    @logging_helper.verbose
+    def test_asyncore_server(self, log):
         """Check the example asyncore integration."""
-        if support.verbose:
-            sys.stdout.write("\n")
-
         indata = b"FOO\n"
         server = AsyncoreEchoServer(CERTFILE)
         with server:
@@ -3575,11 +3553,9 @@ class ThreadedTests(unittest.TestCase):
             if support.verbose:
                 sys.stdout.write(" client:  connection closed.\n")
 
-    def test_recv_send(self):
+    @logging_helper.verbose
+    def test_recv_send(self, log):
         """Test recv(), send() and friends."""
-        if support.verbose:
-            sys.stdout.write("\n")
-
         server = ThreadedEchoServer(CERTFILE,
                                     certreqs=ssl.CERT_NONE,
                                     ssl_version=ssl.PROTOCOL_TLS_SERVER,
@@ -3997,13 +3973,11 @@ class ThreadedTests(unittest.TestCase):
                 s.connect((HOST, server.port))
                 self.assertIn("ECDH", s.cipher()[0])
 
+    @logging_helper.verbose
     @unittest.skipUnless("tls-unique" in ssl.CHANNEL_BINDING_TYPES,
                          "'tls-unique' channel binding not available")
-    def test_tls_unique_channel_binding(self):
+    def test_tls_unique_channel_binding(self, log):
         """Test tls-unique channel binding."""
-        if support.verbose:
-            sys.stdout.write("\n")
-
         client_context, server_context, hostname = testing_context()
 
         server = ThreadedEchoServer(context=server_context,
@@ -4524,10 +4498,8 @@ class TestPostHandshakeAuth(unittest.TestCase):
                     # receive alert
                     s.recv(1024)
 
-    def test_pha_optional(self):
-        if support.verbose:
-            sys.stdout.write("\n")
-
+    @logging_helper.verbose
+    def test_pha_optional(self, log):
         client_context, server_context, hostname = testing_context()
         server_context.post_handshake_auth = True
         server_context.verify_mode = ssl.CERT_REQUIRED
@@ -4548,10 +4520,8 @@ class TestPostHandshakeAuth(unittest.TestCase):
                 s.write(b'HASCERT')
                 self.assertEqual(s.recv(1024), b'TRUE\n')
 
-    def test_pha_optional_nocert(self):
-        if support.verbose:
-            sys.stdout.write("\n")
-
+    @logging_helper.verbose
+    def test_pha_optional_nocert(self, log):
         client_context, server_context, hostname = testing_context()
         server_context.post_handshake_auth = True
         server_context.verify_mode = ssl.CERT_OPTIONAL
