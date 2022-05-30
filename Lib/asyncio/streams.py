@@ -392,6 +392,21 @@ class StreamWriter:
         self._transport = new_transport
         protocol._replace_writer(self)
 
+    async def shutdown_tls(self):
+        """Detach StreamReaderProtocol from SSLProtocol."""
+        old_protocol_side = self._protocol
+        ssl_node = old_protocol_side._transport._ssl_protocol
+        old_transport_side = ssl_node._app_transport
+
+        await self.drain()
+        ssl_node.eof_received()
+
+        old_transport_side.set_protocol(old_protocol_side)
+        old_protocol_side._transport = old_transport_side
+
+        # Implicitly update internal StreamReaderProtocol links
+        old_protocol_side._replace_writer(self)
+
 
 class StreamReader:
 

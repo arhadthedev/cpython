@@ -90,6 +90,13 @@ New Modules
 Improved Modules
 ================
 
+asyncio
+-------
+
+* Add :meth:`~asyncio.streams.StreamWriter.shutdown_tls` method for 
+  downgrading stream-based TLS connections to plain text. (Contributed by Oleg
+  Iarygin in :gh:`xxx`.)
+
 
 Optimizations
 =============

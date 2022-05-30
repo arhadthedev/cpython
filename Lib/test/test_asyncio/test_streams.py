@@ -707,7 +707,7 @@ class StreamTests(test_utils.TestCase):
         self.assertEqual(messages, [])
 
     @unittest.skipIf(ssl is None, 'No ssl module')
-    def test_start_tls(self):
+    def test_start_shutdown_tls(self):
 
         class MyServer:
 
@@ -715,17 +715,30 @@ class StreamTests(test_utils.TestCase):
                 self.server = None
                 self.loop = loop
 
+            async def _perform_iteration(self, client_reader, client_writer):
+                await client_writer.start_tls(
+                    test_utils.simple_server_sslcontext())
+                assert client_writer.get_extra_info('sslcontext') is not None
+                data1 = await client_reader.readline()
+                client_writer.write(data1)
+                await client_writer.drain()
+
+                await client_writer.shutdown_tls()
+                assert client_writer.get_extra_info('sslcontext') is None
+                data2 = await client_reader.readline()
+                client_writer.write(data2)
+                await client_writer.drain()
+
             async def handle_client(self, client_reader, client_writer):
                 data1 = await client_reader.readline()
                 client_writer.write(data1)
                 await client_writer.drain()
                 assert client_writer.get_extra_info('sslcontext') is None
-                await client_writer.start_tls(
-                    test_utils.simple_server_sslcontext())
-                assert client_writer.get_extra_info('sslcontext') is not None
-                data2 = await client_reader.readline()
-                client_writer.write(data2)
-                await client_writer.drain()
+
+                # A stream may be freely upgraded/downgraded many times
+                await self._perform_iteration(client_reader, client_writer)
+                #await self._perform_iteration(client_reader, client_writer)
+
                 client_writer.close()
                 await client_writer.wait_closed()
 
@@ -744,30 +757,40 @@ class StreamTests(test_utils.TestCase):
 
         async def client(addr):
             reader, writer = await asyncio.open_connection(*addr)
-            writer.write(b"hello world 1!\n")
-            await writer.drain()
-            msgback1 = await reader.readline()
-            assert writer.get_extra_info('sslcontext') is None
-            await writer.start_tls(test_utils.simple_client_sslcontext())
-            assert writer.get_extra_info('sslcontext') is not None
-            writer.write(b"hello world 2!\n")
-            await writer.drain()
-            msgback2 = await reader.readline()
+
+            for iteration in range(1):
+                writer.write(b"hello world 1!\n")
+                await writer.drain()
+                msgback1 = await reader.readline()
+                assert writer.get_extra_info('sslcontext') is None
+
+                await writer.start_tls(test_utils.simple_client_sslcontext())
+                assert writer.get_extra_info('sslcontext') is not None
+                writer.write(b"hello world 2!\n")
+                await writer.drain()
+                msgback2 = await reader.readline()
+
+                writer.write(b"hello world 3!\n")
+                await writer.drain()
+                msgback3 = await reader.readline()
+                assert writer.get_extra_info('sslcontext') is None
+
             writer.close()
             await writer.wait_closed()
-            return msgback1, msgback2
+            return msgback1, msgback2, msgback3
 
         messages = []
         self.loop.set_exception_handler(lambda loop, ctx: messages.append(ctx))
 
         server = MyServer(self.loop)
         addr = server.start()
-        msg1, msg2 = self.loop.run_until_complete(client(addr))
+        msg1, msg2, msg3 = self.loop.run_until_complete(client(addr))
         server.stop()
 
         self.assertEqual(messages, [])
         self.assertEqual(msg1, b"hello world 1!\n")
         self.assertEqual(msg2, b"hello world 2!\n")
+        self.assertEqual(msg3, b"hello world 3!\n")
 
     @unittest.skipIf(sys.platform == 'win32', "Don't have pipes")
     def test_read_all_from_pipe_reader(self):

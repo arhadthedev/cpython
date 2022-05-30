@@ -313,6 +313,12 @@ StreamWriter
 
       .. versionadded:: 3.11
 
+   .. coroutinemethod:: shutdown_tls()
+
+      Downgrade a stream-based TLS connection to plain text.
+
+      .. versionadded:: 3.12
+
    .. method:: is_closing()
 
       Return ``True`` if the stream is closed or in the process of

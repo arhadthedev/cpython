@@ -1,0 +1,2 @@
+Adds a ``shutdown_tls()`` method to :class:`~asyncio.streams.StreamWriter`,
+which downgrades the connection from TLS to plain text.
