@@ -3,15 +3,15 @@
 # Modified by Giampaolo Rodola' to give poplib.POP3 and poplib.POP3_SSL
 # a real test suite
 
-import asyncio
-import os
 import poplib
+import asyncore
+import asynchat
 import socket
-from asyncio import sslproto
-from functools import partial
-from test import support as test_support
-from unittest import TestCase, skipUnless
+import os
+import errno
 
+from unittest import TestCase, skipUnless
+from test import support as test_support
 threading = test_support.import_module('threading')
 
 HOST = test_support.HOST
@@ -24,12 +24,6 @@ if hasattr(poplib, 'POP3_SSL'):
     SUPPORTS_SSL = True
     CERTFILE = os.path.join(os.path.dirname(__file__) or os.curdir, "keycert3.pem")
     CAFILE = os.path.join(os.path.dirname(__file__) or os.curdir, "pycacert.pem")
-
-
-    def get_ssl_context():
-        context = ssl.SSLContext()
-        context.load_cert_chain(CERTFILE)
-        return context
 
 requires_ssl = skipUnless(SUPPORTS_SSL, 'SSL not supported')
 
@@ -46,64 +40,43 @@ line3\r\n\
 .\r\n"""
 
 
-class DummyPOP3Handler(asyncio.StreamReaderProtocol):
-    TERMINATOR = b"\r\n"
+class DummyPOP3Handler(asynchat.async_chat):
+
     CAPAS = {'UIDL': [], 'IMPLEMENTATION': ['python-testlib-pop-server']}
     enable_UTF8 = False
 
-    _over_ssl = False
-    _transport = None
-    _handle_task = None
-    _tls_protocol = None
-
-    def __init__(self, loop, ssl_started):
-        self.loop = loop
-        self._tls_started = ssl_started
-
-        super().__init__(
-            asyncio.StreamReader(loop=self.loop),
-            client_connected_cb=self._client_connected_cb,
-            loop=self.loop)
-
-    def connection_made(self, transport):
-        self._transport = transport
-        if transport.get_extra_info('sslcontext') and not self._tls_started:
-            self._stream_reader._transport = self._transport
-            self._stream_writer._transport = self._transport
-        else:
-            super(DummyPOP3Handler, self).connection_made(transport)
-
-    def connection_lost(self, exc):
-        super(DummyPOP3Handler, self).connection_lost(exc)
-        self._transport.close()
-
-    def _client_connected_cb(self, *_):
+    def __init__(self, conn):
+        asynchat.async_chat.__init__(self, conn)
+        self.set_terminator(b"\r\n")
+        self.in_buffer = []
         self.push('+OK dummy pop3 server ready. <timestamp>')
-        self._handle_task = self.loop.create_task(
-            self._handle_client())
+        self.tls_active = False
+        self.tls_starting = False
 
-    def _handle_client(self):
-        while self._transport:
-            try:
-                line = yield from self._stream_reader.readuntil(separator=self.TERMINATOR)
-            except asyncio.IncompleteReadError:
-                break
+    def collect_incoming_data(self, data):
+        self.in_buffer.append(data)
 
-            self._process_line(line.rstrip(self.TERMINATOR))
-
-    def _process_line(self, line):
+    def found_terminator(self):
+        line = b''.join(self.in_buffer)
         line = str(line, 'ISO-8859-1')
-        cmd, arg = line.partition(" ")[::2]
-        method_name = "cmd_{0}".format(cmd.lower())
-        method = getattr(self, method_name, partial(self._unknown_cmd, cmd))
-        method(arg)
+        self.in_buffer = []
+        cmd = line.split(' ')[0].lower()
+        space = line.find(' ')
+        if space != -1:
+            arg = line[space + 1:]
+        else:
+            arg = ""
+        if hasattr(self, 'cmd_' + cmd):
+            method = getattr(self, 'cmd_' + cmd)
+            method(arg)
+        else:
+            self.push('-ERR unrecognized POP3 command "%s".' %cmd)
+
+    def handle_error(self):
+        raise
 
     def push(self, data):
-        data = data.encode("ISO-8859-1") + b'\r\n'
-        self._stream_writer.write(data)
-
-    def _unknown_cmd(self, cmd, _):
-        self.push('-ERR unrecognized POP3 command "%s".' % cmd)
+        asynchat.async_chat.push(self, data.encode("ISO-8859-1") + b'\r\n')
 
     def cmd_echo(self, arg):
         # sends back the received string (used by the test suite)
@@ -112,8 +85,7 @@ class DummyPOP3Handler(asyncio.StreamReaderProtocol):
     def cmd_user(self, arg):
         if arg != "guido":
             self.push("-ERR no such user")
-        else:
-            self.push('+OK password required')
+        self.push('+OK password required')
 
     def cmd_pass(self, arg):
         if arg != "python":
@@ -128,13 +100,13 @@ class DummyPOP3Handler(asyncio.StreamReaderProtocol):
             self.push('+OK %s %s' % (arg, arg))
         else:
             self.push('+OK')
-            self._stream_writer.write(LIST_RESP)
+            asynchat.async_chat.push(self, LIST_RESP)
 
     cmd_uidl = cmd_list
 
     def cmd_retr(self, arg):
-        self.push('+OK %s bytes' % len(RETR_RESP))
-        self._stream_writer.write(RETR_RESP)
+        self.push('+OK %s bytes' %len(RETR_RESP))
+        asynchat.async_chat.push(self, RETR_RESP)
 
     cmd_top = cmd_retr
 
@@ -152,11 +124,11 @@ class DummyPOP3Handler(asyncio.StreamReaderProtocol):
 
     def cmd_quit(self, arg):
         self.push('+OK closing.')
-        self._transport.close()
+        self.close_when_done()
 
     def _get_capas(self):
         _capas = dict(self.CAPAS)
-        if not self._over_ssl and SUPPORTS_SSL:
+        if not self.tls_active and SUPPORTS_SSL:
             _capas['STLS'] = []
         return _capas
 
@@ -176,61 +148,98 @@ class DummyPOP3Handler(asyncio.StreamReaderProtocol):
                   else '-ERR What is UTF8?!')
 
     if SUPPORTS_SSL:
-        def cmd_stls(self, _):
-            if self._over_ssl is False:
+
+        def cmd_stls(self, arg):
+            if self.tls_active is False:
                 self.push('+OK Begin TLS negotiation')
-                self._tls_protocol = sslproto.SSLProtocol(
-                    self.loop,
-                    self,
-                    get_ssl_context(),
-                    None,
-                    server_side=True)
-
-                self._transport._protocol = self._tls_protocol
-                self._tls_protocol.connection_made(self._transport)
-
-                self._over_ssl = True
+                context = ssl.SSLContext()
+                context.load_cert_chain(CERTFILE)
+                tls_sock = context.wrap_socket(self.socket,
+                                               server_side=True,
+                                               do_handshake_on_connect=False,
+                                               suppress_ragged_eofs=False)
+                self.del_channel()
+                self.set_socket(tls_sock)
+                self.tls_active = True
+                self.tls_starting = True
+                self.in_buffer = []
+                self._do_tls_handshake()
             else:
                 self.push('-ERR Command not permitted when TLS active')
 
+        def _do_tls_handshake(self):
+            try:
+                self.socket.do_handshake()
+            except ssl.SSLError as err:
+                if err.args[0] in (ssl.SSL_ERROR_WANT_READ,
+                                   ssl.SSL_ERROR_WANT_WRITE):
+                    return
+                elif err.args[0] == ssl.SSL_ERROR_EOF:
+                    return self.handle_close()
+                raise
+            except OSError as err:
+                if err.args[0] == errno.ECONNABORTED:
+                    return self.handle_close()
+            else:
+                self.tls_active = True
+                self.tls_starting = False
 
-class DummyPOP3Server(threading.Thread):
-    SSL = False
+        def handle_read(self):
+            if self.tls_starting:
+                self._do_tls_handshake()
+            else:
+                try:
+                    asynchat.async_chat.handle_read(self)
+                except ssl.SSLEOFError:
+                    self.handle_close()
+
+class DummyPOP3Server(asyncore.dispatcher, threading.Thread):
+
     handler = DummyPOP3Handler
 
     def __init__(self, address, af=socket.AF_INET):
-        super(DummyPOP3Server, self).__init__()
-        self._stop = threading.Event()
-        self._loop = asyncio.new_event_loop()
-        self._af = af
+        threading.Thread.__init__(self)
+        asyncore.dispatcher.__init__(self)
+        self.create_socket(af, socket.SOCK_STREAM)
+        self.bind(address)
+        self.listen(5)
+        self.active = False
+        self.active_lock = threading.Lock()
+        self.host, self.port = self.socket.getsockname()[:2]
+        self.handler_instance = None
 
-        server_future = self._loop.create_server(lambda: self.handler(self._loop, self.SSL),
-                                                 *address,
-                                                 ssl=get_ssl_context() if self.SSL else None,
-                                                 family=self._af, flags=socket.SOCK_STREAM)
-        self._server = self._loop.run_until_complete(server_future)
-        self.host, self.port = self._server.sockets[0].getsockname()
+    def start(self):
+        assert not self.active
+        self.__flag = threading.Event()
+        threading.Thread.start(self)
+        self.__flag.wait()
 
     def run(self):
-        self._loop.run_forever()
-        self._server.close()
-        self._loop.run_until_complete(self._server.wait_closed())
-        self._cancel_tasks()
-        self._loop.close()
-        self._stop.set()
+        self.active = True
+        self.__flag.set()
+        while self.active and asyncore.socket_map:
+            self.active_lock.acquire()
+            asyncore.loop(timeout=0.1, count=1)
+            self.active_lock.release()
+        asyncore.close_all(ignore_all=True)
 
     def stop(self):
-        self._loop.call_soon_threadsafe(self._loop.stop)
-        self._stop.wait()
+        assert self.active
+        self.active = False
+        self.join()
 
-    def _cancel_tasks(self):
-        pending = asyncio.Task.all_tasks(loop=self._loop)
-        if pending:
-            self._loop.run_until_complete(asyncio.gather(*pending))
+    def handle_accepted(self, conn, addr):
+        self.handler_instance = self.handler(conn)
 
+    def handle_connect(self):
+        self.close()
+    handle_read = handle_connect
 
-class DummyPOP3ServerSSL(DummyPOP3Server):
-    SSL = True
+    def writable(self):
+        return 0
+
+    def handle_error(self):
+        raise
 
 
 class TestPOP3Class(TestCase):
@@ -243,8 +252,7 @@ class TestPOP3Class(TestCase):
         self.client = poplib.POP3(self.server.host, self.server.port, timeout=3)
 
     def tearDown(self):
-        if self.client.file is not None and self.client.sock is not None:
-            self.client.quit()
+        self.client.close()
         self.server.stop()
 
     def test_getwelcome(self):
@@ -284,10 +292,6 @@ class TestPOP3Class(TestCase):
         self.assertRaises(poplib.error_proto, self.client._shortcmd,
                           'echo +%s' % ((poplib._MAXLINE + 10) * 'a'))
 
-        # read remaining data, otherwise it will be treated as response
-        # to QUIT and client close connection to quickly
-        self.client.file.readline()
-
     def test_dele(self):
         self.assertOK(self.client.dele('foo'))
 
@@ -301,11 +305,11 @@ class TestPOP3Class(TestCase):
         self.assertOK(self.client.apop('foo', 'dummypassword'))
 
     def test_top(self):
-        expected = (b'+OK 116 bytes',
-                    [b'From: postmaster@python.org', b'Content-Type: text/plain',
-                     b'MIME-Version: 1.0', b'Subject: Dummy', b'',
-                     b'line1', b'line2', b'line3'],
-                    113)
+        expected =  (b'+OK 116 bytes',
+                     [b'From: postmaster@python.org', b'Content-Type: text/plain',
+                      b'MIME-Version: 1.0', b'Subject: Dummy', b'',
+                      b'line1', b'line2', b'line3'],
+                     113)
         self.assertEqual(self.client.top(1, 1), expected)
 
     def test_uidl(self):
@@ -357,12 +361,28 @@ class TestPOP3Class(TestCase):
         self.assertEqual(resp, expected)
 
 
+if SUPPORTS_SSL:
+    from test.test_ftplib import SSLConnection
+
+    class DummyPOP3_SSLHandler(SSLConnection, DummyPOP3Handler):
+
+        def __init__(self, conn):
+            asynchat.async_chat.__init__(self, conn)
+            self.secure_connection()
+            self.set_terminator(b"\r\n")
+            self.in_buffer = []
+            self.push('+OK dummy pop3 server ready. <timestamp>')
+            self.tls_active = True
+            self.tls_starting = False
+
+
 @requires_ssl
 class TestPOP3_SSLClass(TestPOP3Class):
     # repeat previous tests by using poplib.POP3_SSL
 
     def setUp(self):
-        self.server = DummyPOP3ServerSSL((HOST, PORT))
+        self.server = DummyPOP3Server((HOST, PORT))
+        self.server.handler = DummyPOP3_SSLHandler
         self.server.start()
         self.client = poplib.POP3_SSL(self.server.host, self.server.port)
 
@@ -372,16 +392,16 @@ class TestPOP3_SSLClass(TestPOP3Class):
     def test_context(self):
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
         self.assertRaises(ValueError, poplib.POP3_SSL, self.server.host,
-                          self.server.port, keyfile=CERTFILE, context=ctx)
+                            self.server.port, keyfile=CERTFILE, context=ctx)
         self.assertRaises(ValueError, poplib.POP3_SSL, self.server.host,
-                          self.server.port, certfile=CERTFILE, context=ctx)
+                            self.server.port, certfile=CERTFILE, context=ctx)
         self.assertRaises(ValueError, poplib.POP3_SSL, self.server.host,
-                          self.server.port, keyfile=CERTFILE,
-                          certfile=CERTFILE, context=ctx)
+                            self.server.port, keyfile=CERTFILE,
+                            certfile=CERTFILE, context=ctx)
 
         self.client.quit()
         self.client = poplib.POP3_SSL(self.server.host, self.server.port,
-                                      context=ctx)
+                                        context=ctx)
         self.assertIsInstance(self.client.sock, ssl.SSLSocket)
         self.assertIs(self.client.sock.context, ctx)
         self.assertTrue(self.client.noop().startswith(b'+OK'))
@@ -406,6 +426,17 @@ class TestPOP3_TLSClass(TestPOP3Class):
         self.client = poplib.POP3(self.server.host, self.server.port, timeout=3)
         self.client.stls()
 
+    def tearDown(self):
+        if self.client.file is not None and self.client.sock is not None:
+            try:
+                self.client.quit()
+            except poplib.error_proto:
+                # happens in the test_too_long_lines case; the overlong
+                # response will be treated as response to QUIT and raise
+                # this exception
+                self.client.close()
+        self.server.stop()
+
     def test_stls(self):
         self.assertRaises(poplib.error_proto, self.client.stls)
 
@@ -417,12 +448,13 @@ class TestPOP3_TLSClass(TestPOP3Class):
 
 
 class TestTimeouts(TestCase):
+
     def setUp(self):
         self.evt = threading.Event()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.settimeout(60)  # Safety net. Look issue 11812
         self.port = test_support.bind_port(self.sock)
-        self.thread = threading.Thread(target=self.server, args=(self.evt, self.sock))
+        self.thread = threading.Thread(target=self.server, args=(self.evt,self.sock))
         self.thread.setDaemon(True)
         self.thread.start()
         self.evt.wait()
