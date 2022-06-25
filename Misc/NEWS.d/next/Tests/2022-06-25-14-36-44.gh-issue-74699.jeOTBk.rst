@@ -1,0 +1,3 @@
+:mod:`test.test_poplib` no longer uses ``smtpd`` as a test server. Instead,
+it implements its own mock one with minimum required features. Patch by
+Grzegorz Grzywacz.
