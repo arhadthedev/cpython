@@ -11,12 +11,14 @@ import tempfile
 import textwrap
 import unittest
 import warnings
+from threading import Condition, Thread
 
 from test import support
 from test.support import import_helper
 from test.support import os_helper
 from test.support import script_helper
 from test.support import socket_helper
+from test.support import threading_helper
 from test.support import warnings_helper
 
 TESTFN = os_helper.TESTFN
@@ -704,11 +706,53 @@ class TestSupport(unittest.TestCase):
     # bigaddrspacetest
     # requires_resource
     # run_doctest
-    # threading_cleanup
     # reap_threads
     # can_symlink
     # skip_unless_symlink
     # SuppressCrashReport
+
+
+class ThreadingHelper(unittest.TestCase):
+
+    class DummyTestClass:
+
+        def __init__(self):
+            self.release_dangling = Condition()
+
+        def _dangling(self):
+            with self.release_dangling:
+                self.release_dangling.wait()
+
+        def _finite(self):
+            pass
+
+        def setUp(self):
+            self.dangling = Thread(target=self._dangling, daemon=True)
+            self.dangling.start()
+
+            self.cleaned = Thread(target=self._finite, daemon=True)
+            self.cleaned.start()
+
+        def tearDown(self):
+            threading_helper.join_thread(self.cleaned)
+            self.cleaned = None
+
+    def test_threading_cleanup(self):
+        threads = threading_helper.threading_setup()
+        dummy = self.DummyTestClass()
+        dummy.setUp()
+        dummy.tearDown()
+        # Once more to allow an uncleaned reference to leak between test cases
+        dummy.setUp()
+        dummy.tearDown()
+        # One leaked the first time, another leaks the second time
+        with self.assertRaisesRegex(AssertionError, '2 threads leaked'):
+            threading_helper.threading_cleanup(*threads)
+
+        # Release all "dangling" threads to not trigger outside checks
+        with dummy.release_dangling:
+            dummy.release_dangling.notify_all()
+        threading_helper.join_thread(dummy.dangling)
 
 
 if __name__ == '__main__':

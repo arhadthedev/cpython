@@ -1304,8 +1304,12 @@ The :mod:`test.support.threading_helper` module provides support for threading t
 
 .. function:: threading_cleanup(*original_values)
 
-   Cleanup up threads not specified in *original_values*.  Designed to emit
-   a warning if a test leaves running threads in the background.
+   Cleanup up threads not specified in *original_values*.  Raises
+   :exc:`AssertionError` with a list of threads if a test leaves running
+   threads in the background.
+
+   .. versionchanged:: 3.12
+      Changed from printing a warning to raising :exc:`AssertionError`.
 
 
 .. function:: threading_setup()

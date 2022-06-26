@@ -37,15 +37,13 @@ def threading_cleanup(*original_values):
             # Display a warning at the first iteration
             support.environment_altered = True
             dangling_threads = values[1]
-            support.print_warning(f"threading_cleanup() failed to cleanup "
-                                  f"{values[0] - original_values[0]} threads "
-                                  f"(count: {values[0]}, "
-                                  f"dangling: {len(dangling_threads)})")
-            for thread in dangling_threads:
-                support.print_warning(f"Dangling thread: {thread!r}")
-
-            # Don't hold references to threads
-            dangling_threads = None
+            dangling_count = values[0] - original_values[0]
+            ending = 's' if dangling_count > 1 else ''
+            message = f'{dangling_count} thread{ending} leaked'
+            leak_info = AssertionError(message)
+            thread_list = ', '.join(repr(thread) for thread in dangling_threads)
+            leak_info.add_note(f'Dangling threads: {thread_list}')
+            raise leak_info
         values = None
 
         time.sleep(0.01)
