@@ -740,6 +740,11 @@ class IocpProactor:
         # completion port, were must register the handle.
         if obj not in self._registered:
             self._registered.add(obj)
+            try:
+                raise AssertionError()
+            except AssertionError:
+                import traceback
+                print(traceback.format_exc())
             _overlapped.CreateIoCompletionPort(obj.fileno(), self._iocp, 0, 0)
             # XXX We could also use SetFileCompletionNotificationModes()
             # to avoid sending notifications to completion port of ops

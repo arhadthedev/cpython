@@ -229,8 +229,10 @@ _overlapped_CreateIoCompletionPort_impl(PyObject *module, HANDLE FileHandle,
     HANDLE ret;
 
     Py_BEGIN_ALLOW_THREADS
+    DWORD error = GetLastError();
     ret = CreateIoCompletionPort(FileHandle, ExistingCompletionPort,
-                                 CompletionKey, NumberOfConcurrentThreads);
+                                 CompletionKey, NumberOfConcurrentThreads)
+    ;printf("\nCreateIoCompletionPort(%p, %p, %p, %u) == %i; GetLastError() == %d", FileHandle, ExistingCompletionPort, CompletionKey, NumberOfConcurrentThreads, (unsigned)ret, (int)GetLastError());
     Py_END_ALLOW_THREADS
 
     if (ret == NULL)
