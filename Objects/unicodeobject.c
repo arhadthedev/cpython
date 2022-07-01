@@ -12738,30 +12738,31 @@ unicode_zfill_impl(PyObject *self, Py_ssize_t width)
     return u;
 }
 
-PyDoc_STRVAR(startswith__doc__,
-             "S.startswith(prefix[, start[, end]]) -> bool\n\
-\n\
-Return True if S starts with the specified prefix, False otherwise.\n\
-With optional start, test S beginning at that position.\n\
-With optional end, stop comparing S at that position.\n\
-prefix can also be a tuple of strings to try.");
+/*[clinic input]
+str.startswith as unicode_startswith
+    prefix as subobj: object
+    start: int = 0
+    end: Py_ssize_t(c_default="PY_SSIZE_T_MAX") = sys.maxsize
+    /
+
+Return True if a string starts with the specified prefix, False otherwise.
+
+With optional start, test string beginning at that position.
+With optional end, stop comparing S at that position.
+prefix can also be a tuple of strings to try.
+[clinic start generated code]*/
 
 static PyObject *
-unicode_startswith(PyObject *self,
-                   PyObject *args)
+unicode_startswith_impl(PyObject *self, PyObject *subobj, int start,
+                        Py_ssize_t end)
+/*[clinic end generated code: output=9fb28713cc2ea6b6 input=94c49e8eabdc3d56]*/
 {
-    PyObject *subobj;
-    PyObject *substring;
-    Py_ssize_t start = 0;
-    Py_ssize_t end = PY_SSIZE_T_MAX;
     int result;
 
-    if (!asciilib_parse_args_finds("startswith", args, &subobj, &start, &end))
-        return NULL;
     if (PyTuple_Check(subobj)) {
         Py_ssize_t i;
         for (i = 0; i < PyTuple_GET_SIZE(subobj); i++) {
-            substring = PyTuple_GET_ITEM(subobj, i);
+            PyObject *substring = PyTuple_GET_ITEM(subobj, i);
             if (!PyUnicode_Check(substring)) {
                 PyErr_Format(PyExc_TypeError,
                              "tuple for startswith must only contain str, "
@@ -12791,31 +12792,31 @@ unicode_startswith(PyObject *self,
     return PyBool_FromLong(result);
 }
 
+/*[clinic input]
+str.endswith as unicode_endswith
+    suffix as subobj: object
+    start: int = 0
+    end: Py_ssize_t(c_default="PY_SSIZE_T_MAX") = sys.maxsize
+    /
 
-PyDoc_STRVAR(endswith__doc__,
-             "S.endswith(suffix[, start[, end]]) -> bool\n\
-\n\
-Return True if S ends with the specified suffix, False otherwise.\n\
-With optional start, test S beginning at that position.\n\
-With optional end, stop comparing S at that position.\n\
-suffix can also be a tuple of strings to try.");
+Return True if a string ends with the specified suffix, False otherwise.
+
+With optional start, test string beginning at that position.
+With optional end, stop comparing string at that position.
+Suffix can also be a tuple of strings to try.
+[clinic start generated code]*/
 
 static PyObject *
-unicode_endswith(PyObject *self,
-                 PyObject *args)
+unicode_endswith_impl(PyObject *self, PyObject *subobj, int start,
+                      Py_ssize_t end)
+/*[clinic end generated code: output=ce679ba18f030c5d input=e352e94209345f94]*/
 {
-    PyObject *subobj;
-    PyObject *substring;
-    Py_ssize_t start = 0;
-    Py_ssize_t end = PY_SSIZE_T_MAX;
     int result;
 
-    if (!asciilib_parse_args_finds("endswith", args, &subobj, &start, &end))
-        return NULL;
     if (PyTuple_Check(subobj)) {
         Py_ssize_t i;
         for (i = 0; i < PyTuple_GET_SIZE(subobj); i++) {
-            substring = PyTuple_GET_ITEM(subobj, i);
+            PyObject *substring = PyTuple_GET_ITEM(subobj, i);
             if (!PyUnicode_Check(substring)) {
                 PyErr_Format(PyExc_TypeError,
                              "tuple for endswith must only contain str, "
@@ -13292,8 +13293,8 @@ static PyMethodDef unicode_methods[] = {
     UNICODE_SWAPCASE_METHODDEF
     UNICODE_TRANSLATE_METHODDEF
     UNICODE_UPPER_METHODDEF
-    {"startswith", (PyCFunction) unicode_startswith, METH_VARARGS, startswith__doc__},
-    {"endswith", (PyCFunction) unicode_endswith, METH_VARARGS, endswith__doc__},
+    UNICODE_STARTSWITH_METHODDEF
+    UNICODE_ENDSWITH_METHODDEF
     UNICODE_REMOVEPREFIX_METHODDEF
     UNICODE_REMOVESUFFIX_METHODDEF
     UNICODE_ISASCII_METHODDEF

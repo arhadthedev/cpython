@@ -1,0 +1,1 @@
+Use Argument Clinic for :meth:`str.startswith` and :meth:`str.endswith`.
