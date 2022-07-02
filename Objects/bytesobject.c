@@ -1862,8 +1862,27 @@ _PyBytes_Join(PyObject *sep, PyObject *x)
     return bytes_join((PyBytesObject*)sep, x);
 }
 
+/*[clinic input]
+bytes.find as bytes_find
+
+    subsection: object
+    start: Py_ssize_t = 0
+    end: Py_ssize_t(c_default="PY_SSIZE_T_MAX") = sys.maxsize
+    /
+
+Find a subsection in a given range.
+
+Return the lowest index in a byte array where subsection is found,
+such that is contained within array[start,end].  Optional
+arguments start and end are interpreted as in slice notation.
+
+Return -1 on failure.
+[clinic start generated code]*/
+
 static PyObject *
-bytes_find(PyBytesObject *self, PyObject *args)
+bytes_find_impl(PyBytesObject *self, PyObject *subsection, Py_ssize_t start,
+                Py_ssize_t end)
+/*[clinic end generated code: output=2c88f1df862f359b input=82e7013d08f6d38d]*/
 {
     return _Py_bytes_find(PyBytes_AS_STRING(self), PyBytes_GET_SIZE(self), args);
 }

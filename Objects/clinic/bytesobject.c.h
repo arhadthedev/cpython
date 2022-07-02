@@ -249,6 +249,74 @@ PyDoc_STRVAR(bytes_join__doc__,
 #define BYTES_JOIN_METHODDEF    \
     {"join", (PyCFunction)bytes_join, METH_O, bytes_join__doc__},
 
+PyDoc_STRVAR(bytes_find__doc__,
+"find($self, subsection, start=0, end=sys.maxsize, /)\n"
+"--\n"
+"\n"
+"Find a subsection in a given range.\n"
+"\n"
+"Return the lowest index in a byte array where subsection is found,\n"
+"such that is contained within array[start,end].  Optional\n"
+"arguments start and end are interpreted as in slice notation.\n"
+"\n"
+"Return -1 on failure.");
+
+#define BYTES_FIND_METHODDEF    \
+    {"find", _PyCFunction_CAST(bytes_find), METH_FASTCALL, bytes_find__doc__},
+
+static PyObject *
+bytes_find_impl(PyBytesObject *self, PyObject *subsection, Py_ssize_t start,
+                Py_ssize_t end);
+
+static PyObject *
+bytes_find(PyBytesObject *self, PyObject *const *args, Py_ssize_t nargs)
+{
+    PyObject *return_value = NULL;
+    PyObject *subsection;
+    Py_ssize_t start = 0;
+    Py_ssize_t end = PY_SSIZE_T_MAX;
+
+    if (!_PyArg_CheckPositional("find", nargs, 1, 3)) {
+        goto exit;
+    }
+    subsection = args[0];
+    if (nargs < 2) {
+        goto skip_optional;
+    }
+    {
+        Py_ssize_t ival = -1;
+        PyObject *iobj = _PyNumber_Index(args[1]);
+        if (iobj != NULL) {
+            ival = PyLong_AsSsize_t(iobj);
+            Py_DECREF(iobj);
+        }
+        if (ival == -1 && PyErr_Occurred()) {
+            goto exit;
+        }
+        start = ival;
+    }
+    if (nargs < 3) {
+        goto skip_optional;
+    }
+    {
+        Py_ssize_t ival = -1;
+        PyObject *iobj = _PyNumber_Index(args[2]);
+        if (iobj != NULL) {
+            ival = PyLong_AsSsize_t(iobj);
+            Py_DECREF(iobj);
+        }
+        if (ival == -1 && PyErr_Occurred()) {
+            goto exit;
+        }
+        end = ival;
+    }
+skip_optional:
+    return_value = bytes_find_impl(self, subsection, start, end);
+
+exit:
+    return return_value;
+}
+
 PyDoc_STRVAR(bytes_strip__doc__,
 "strip($self, bytes=None, /)\n"
 "--\n"
@@ -896,4 +964,4 @@ skip_optional_pos:
 exit:
     return return_value;
 }
-/*[clinic end generated code: output=5727702e63a0a8b7 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=ac6557394d74e571 input=a9049054013a1b77]*/
