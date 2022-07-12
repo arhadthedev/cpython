@@ -1,0 +1,4 @@
+:func:`pwd.getpwuid` and :func:`pwd.getpwall` now differentiate between a
+lack of record (:data:`None` is returned) and a database access error
+(:exc:`OSException` is risen) to be consistent with :func:`pwd.getpwnam`.
+Path by Oleg Iarygin.

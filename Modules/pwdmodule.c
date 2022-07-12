@@ -264,9 +264,12 @@ pwd_getpwnam_impl(PyObject *module, PyObject *name)
         if (nomem == 1) {
             PyErr_NoMemory();
         }
-        else {
+        else if (errno == 0) {
             PyErr_Format(PyExc_KeyError,
                          "getpwnam(): name not found: %R", name);
+        }
+        else {
+            PyErr_SetFromErrno(PyExc_OSError)
         }
         goto out;
     }
@@ -306,6 +309,10 @@ pwd_getpwall_impl(PyObject *module)
         Py_DECREF(v);
     }
     endpwent();
+    if (p == NULL) {
+        PyErr_SetFromErrno(PyExc_OSError)
+        return NULL
+    }
     return d;
 }
 #endif
