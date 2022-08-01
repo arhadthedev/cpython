@@ -424,19 +424,20 @@ def hook_encoded(encoding, errors=None):
 
 
 def _test():
-    import getopt
-    inplace = False
-    backup = False
-    opts, args = getopt.getopt(sys.argv[1:], "ib:")
-    for o, a in opts:
-        if o == '-i': inplace = True
-        if o == '-b': backup = a
-    for line in input(args, inplace=inplace, backup=backup):
-        if line[-1:] == '\n': line = line[:-1]
-        if line[-1:] == '\r': line = line[:-1]
-        print("%d: %s[%d]%s %s" % (lineno(), filename(), filelineno(),
-                                   isfirstline() and "*" or "", line))
-    print("%d: %s[%d]" % (lineno(), filename(), filelineno()))
+    from argparse import ArgumentParser
+    parser = ArgumentParser(description='show glued content of files')
+    parser.add_argument('-i', '--inplace', action='store_true',
+                        help='access original files, not copies')
+    parser.add_argument('-b', '--backup', action='store_true',
+                        help='file extension for the copies')
+    parser.add_argument('file', nargs='+', help='Input path')
+    arguments = parser.parse_args()
+
+    for line in input(arguments.file, arguments.inplace, arguments.backup):
+        line = line.rstrip('\r\n')
+        start_flag = '*' if isfirstline() else ''
+        print(f'{lineno()}: {filename()}[{filelineno()}]{start_flag} {line}')
+    print(f'{lineno()}: {filename()}[{filelineno()}]')
 
 if __name__ == '__main__':
     _test()

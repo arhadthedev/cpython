@@ -1460,33 +1460,13 @@ def fix_x11_paste(root):
                         root.bind_class(cls, '<<Paste>>'))
 
 
-usage_msg = """\
+usage="""%(prog)s -h
+       %(prog)s [-deins] [-t title] [file ...]
+       %(prog)s [-dns] [-t title] (-c cmd | -r file) [arg ...]
+       %(prog)s [-dns] [-t title] - [arg ...]"""
 
-USAGE: idle  [-deins] [-t title] [file]*
-       idle  [-dns] [-t title] (-c cmd | -r file) [arg]*
-       idle  [-dns] [-t title] - [arg]*
-
-  -h         print this help message and exit
-  -n         run IDLE without a subprocess (DEPRECATED,
-             see Help/IDLE Help for details)
-
-The following options will override the IDLE 'settings' configuration:
-
-  -e         open an edit window
-  -i         open a shell window
-
-The following options imply -i and will open a shell:
-
-  -c cmd     run the command in a shell, or
-  -r file    run script from file
-
-  -d         enable the debugger
-  -s         run $IDLESTARTUP or $PYTHONSTARTUP before anything else
-  -t title   set title of shell window
-
+epilog = """\
 A default edit window will be bypassed when -c, -r, or - are used.
-
-[arg]* are passed to the command (-c) or script (-r) in sys.argv[1:].
 
 Examples:
 
@@ -1511,11 +1491,10 @@ idle -d -s -r foo.py "Hello World"
 
 echo "import sys; print(sys.argv)" | idle - "foobar"
         Open a shell window, run the script piped in, passing '' in sys.argv[0]
-        and "foobar" in sys.argv[1].
-"""
+        and "foobar" in sys.argv[1]."""
 
 def main():
-    import getopt
+    from argparse import ArgumentParser, RawTextHelpFormatter
     from platform import system
     from idlelib import testing  # bool value
     from idlelib import macosx
@@ -1523,18 +1502,34 @@ def main():
     global flist, root, use_subprocess
 
     capture_warnings(True)
-    use_subprocess = True
-    enable_shell = False
-    enable_edit = False
-    debug = False
-    cmd = None
-    script = None
-    startup = False
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], "c:deihnr:st:")
-    except getopt.error as msg:
-        print("Error: %s\n%s" % (msg, usage_msg), file=sys.stderr)
-        sys.exit(2)
+    parser = ArgumentParser(description='Python’s Integrated Development and '
+                            'Learning Environment', usage=usage, epilog=epilog,
+                            formatter_class=RawTextHelpFormatter)
+    parser.add_argument('-n', action='store_true', help='run IDLE without a '
+                        'subprocess (DEPRECATED, see Help/IDLE Help for '
+                        'details)')
+    parser.add_argument('file', nargs='*', help='file path to open')
+    parser.add_argument('arg', nargs='*', help='parameter passed to the '
+                        'command (-c), script (-r), or REPL (-) in '
+                        'sys.argv[1:]')
+    settings = parser.add_argument_group(description="the following options "
+                                         "have priority over the IDLE "
+                                         "'settings' configuration:")
+    settings.add_argument('-e', '--edit', action='store_true', help='open an edit window')
+    settings.add_argument('-i', '--interactive', action='store_true', help='open a shell window')
+    shell = parser.add_argument_group(description='the following options '
+                                      'imply -i:')
+    run = parser.add_mutually_exclusive_group()
+    run.add_argument('-c', '--command', metavar='cmd',
+                       help='run the command in a shell, or')
+    run.add_argument('-r', '--run', metavar='file', help='run script from file')
+    shell.add_argument('-d', '--debug', action='store_true', help='enable the debugger')
+    shell.add_argument('-s', action='store_true', help='run $IDLESTARTUP or '
+                       '$PYTHONSTARTUP before anything else')
+    shell.add_argument('-t', '--title', metavar='title', help='set title of shell window')
+
+    arguments = parser.parse_args()
+
     for o, a in opts:
         if o == '-c':
             cmd = a
