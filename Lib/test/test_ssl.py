@@ -261,10 +261,10 @@ def requires_tls_version(version):
     return decorator
 
 
-def handle_error(prefix):
+@logging_helper.verbose
+def handle_error(log, prefix):
     exc_format = ' '.join(traceback.format_exception(*sys.exc_info()))
-    if support.verbose:
-        sys.stdout.write(prefix + exc_format)
+    log(prefix + exc_format)
 
 
 def utc_offset(): #NOTE: ignore issues like #1647654
@@ -377,12 +377,11 @@ class BasicSocketTests(unittest.TestCase):
         ctx = ssl.SSLContext(proto)
         self.assertIs(ctx.protocol, proto)
 
-    def test_random(self):
+    @logging_helper.verbose
+    def test_random(self, log):
         v = ssl.RAND_status()
-        if support.verbose:
-            sys.stdout.write("\n RAND_status is %d (%s)\n"
-                             % (v, (v and "sufficient randomness") or
-                                "insufficient randomness"))
+        status = "sufficient" if v else "insufficient"
+        log('RAND_status is {v} ({status} randomness)')
 
         with warnings_helper.check_warnings():
             data, is_cryptographic = ssl.RAND_pseudo_bytes(16)
@@ -403,7 +402,8 @@ class BasicSocketTests(unittest.TestCase):
         ssl.RAND_add(b"this is a random bytes object", 75.0)
         ssl.RAND_add(bytearray(b"this is a random bytearray object"), 75.0)
 
-    def test_parse_cert(self):
+    @logging_helper.verbose
+    def test_parse_cert(self, log):
         # note that this uses an 'unofficial' function in _ssl.c,
         # provided solely for this test, to exercise the certificate
         # parsing code
@@ -419,8 +419,7 @@ class BasicSocketTests(unittest.TestCase):
         # Issue #13034: the subjectAltName in some certificates
         # (notably projects.developer.nokia.com:443) wasn't parsed
         p = ssl._ssl._test_decode_cert(NOKIACERT)
-        if support.verbose:
-            sys.stdout.write("\n" + pprint.pformat(p) + "\n")
+        log(pprint.pformat(p))
         self.assertEqual(p['subjectAltName'],
                          (('DNS', 'projects.developer.nokia.com'),
                           ('DNS', 'projects.forum.nokia.com'))
@@ -432,10 +431,10 @@ class BasicSocketTests(unittest.TestCase):
         self.assertEqual(p['crlDistributionPoints'],
                          ('http://SVRIntl-G3-crl.verisign.com/SVRIntlG3.crl',))
 
-    def test_parse_cert_CVE_2019_5010(self):
+    @logging_helper.verbose
+    def test_parse_cert_CVE_2019_5010(self, log):
         p = ssl._ssl._test_decode_cert(TALOS_INVALID_CRLDP)
-        if support.verbose:
-            sys.stdout.write("\n" + pprint.pformat(p) + "\n")
+        log( pprint.pformat(p))
         self.assertEqual(
             p,
             {
@@ -453,10 +452,10 @@ class BasicSocketTests(unittest.TestCase):
             }
         )
 
-    def test_parse_cert_CVE_2013_4238(self):
+    @logging_helper.verbose
+    def test_parse_cert_CVE_2013_4238(self, log):
         p = ssl._ssl._test_decode_cert(NULLBYTECERT)
-        if support.verbose:
-            sys.stdout.write("\n" + pprint.pformat(p) + "\n")
+        log(pprint.pformat(p))
         subject = ((('countryName', 'US'),),
                    (('stateOrProvinceName', 'Oregon'),),
                    (('localityName', 'Beaverton'),),
@@ -2159,7 +2158,8 @@ class SimpleBackgroundTests(unittest.TestCase):
             os.read(fd, 0)
         self.assertEqual(e.exception.errno, errno.EBADF)
 
-    def test_non_blocking_handshake(self):
+    @logging_helper.verbose
+    def test_non_blocking_handshake(self, log):
         s = socket.socket(socket.AF_INET)
         s.connect(self.server_addr)
         s.setblocking(False)
@@ -2177,12 +2177,12 @@ class SimpleBackgroundTests(unittest.TestCase):
                 select.select([s], [], [])
             except ssl.SSLWantWriteError:
                 select.select([], [s], [])
-        if support.verbose:
-            sys.stdout.write("\nNeeded %d calls to do_handshake() to establish session.\n" % count)
+        log(f"Needed {count} calls to do_handshake() to establish session")
 
     def test_get_server_certificate(self):
         _test_get_server_certificate(self, *self.server_addr, cert=SIGNING_CA)
 
+    @logging_helper.verbose
     def test_get_server_certificate_sni(self):
         host, port = self.server_addr
         server_names = []
@@ -2199,8 +2199,7 @@ class SimpleBackgroundTests(unittest.TestCase):
         pem = ssl.get_server_certificate((host, port), ca_certs=SIGNING_CA)
         if not pem:
             self.fail("No server certificate on %s:%s!" % (host, port))
-        if support.verbose:
-            sys.stdout.write("\nVerified certificate for %s:%s is\n%s\n" % (host, port, pem))
+        log("Verified certificate for %s:%s is\n%s\n" % (host, port, pem))
 
         self.assertEqual(server_names, [host, host])
 
@@ -2259,6 +2258,7 @@ class SimpleBackgroundTests(unittest.TestCase):
             self.assertIs(ss.context, ctx2)
             self.assertIs(ss._sslobj.context, ctx2)
 
+    @logging_helper.verbose
     def ssl_io_loop(self, sock, incoming, outgoing, func, *args, **kwargs):
         # A simple IO loop. Call func(*args) depending on the error we get
         # (WANT_READ or WANT_WRITE) move data between the socket and the BIOs.
@@ -2291,9 +2291,7 @@ class SimpleBackgroundTests(unittest.TestCase):
                     incoming.write(buf)
                 else:
                     incoming.write_eof()
-        if support.verbose:
-            sys.stdout.write("Needed %d calls to complete %s().\n"
-                             % (count, func.__name__))
+        log("Needed %d calls to complete %s()." % (count, func.__name__))
         return ret
 
     def test_bio_handshake(self):
@@ -2374,6 +2372,7 @@ class NetworkedTests(unittest.TestCase):
             _test_get_server_certificate_fail(self, 'ipv6.google.com', 443)
 
 
+@logging_helper.verbose
 def _test_get_server_certificate(test, host, port, cert=None):
     pem = ssl.get_server_certificate((host, port))
     if not pem:
@@ -2382,16 +2381,15 @@ def _test_get_server_certificate(test, host, port, cert=None):
     pem = ssl.get_server_certificate((host, port), ca_certs=cert)
     if not pem:
         test.fail("No server certificate on %s:%s!" % (host, port))
-    if support.verbose:
-        sys.stdout.write("\nVerified certificate for %s:%s is\n%s\n" % (host, port ,pem))
+    log("Verified certificate for %s:%s is\n%s" % (host, port ,pem))
 
+@logging_helper.verbose
 def _test_get_server_certificate_fail(test, host, port):
     try:
         pem = ssl.get_server_certificate((host, port), ca_certs=CERTFILE)
     except ssl.SSLError as x:
         #should fail
-        if support.verbose:
-            sys.stdout.write("%s\n" % x)
+        log(x)
     else:
         test.fail("Got server certificate %s for %s:%s!" % (pem, host, port))
 
@@ -2416,7 +2414,8 @@ class ThreadedEchoServer(threading.Thread):
             threading.Thread.__init__(self)
             self.daemon = True
 
-        def wrap_conn(self):
+        @logging_helper.verbose
+        def wrap_conn(self, log):
             try:
                 self.sslconn = self.server.context.wrap_socket(
                     self.sock, server_side=True)
@@ -2465,17 +2464,17 @@ class ThreadedEchoServer(threading.Thread):
                 self.server.shared_ciphers.append(self.sslconn.shared_ciphers())
                 if self.server.context.verify_mode == ssl.CERT_REQUIRED:
                     cert = self.sslconn.getpeercert()
-                    if support.verbose and self.server.chatty:
-                        sys.stdout.write(" client cert is " + pprint.pformat(cert) + "\n")
+                    if self.server.chatty:
+                        log(" client cert is " + pprint.pformat(cert))
                     cert_binary = self.sslconn.getpeercert(True)
-                    if support.verbose and self.server.chatty:
+                    if self.server.chatty:
                         if cert_binary is None:
-                            sys.stdout.write(" client did not provide a cert\n")
+                            log(" client did not provide a cert")
                         else:
-                            sys.stdout.write(f" cert binary is {len(cert_binary)}b\n")
+                            log(f" cert binary is {len(cert_binary)}b")
                 cipher = self.sslconn.cipher()
-                if support.verbose and self.server.chatty:
-                    sys.stdout.write(" server: connection cipher is now " + str(cipher) + "\n")
+                if self.server.chatty:
+                    log(f" server: connection cipher is now {cipher}")
                 return True
 
         def read(self):
@@ -2496,7 +2495,8 @@ class ThreadedEchoServer(threading.Thread):
             else:
                 self.sock.close()
 
-        def run(self):
+        @logging_helper.verbose
+        def run(self, log):
             self.running = True
             if not self.server.starttls_server:
                 if not self.wrap_conn():
@@ -2519,14 +2519,14 @@ class ThreadedEchoServer(threading.Thread):
                             self.sslconn = None
                         self.close()
                     elif stripped == b'over':
-                        if support.verbose and self.server.connectionchatty:
-                            sys.stdout.write(" server: client closed connection\n")
+                        if self.server.connectionchatty:
+                            log(" server: client closed connection")
                         self.close()
                         return
                     elif (self.server.starttls_server and
                           stripped == b'STARTTLS'):
-                        if support.verbose and self.server.connectionchatty:
-                            sys.stdout.write(" server: read STARTTLS from client, sending OK...\n")
+                        if self.server.connectionchatty:
+                            log(" server: read STARTTLS from client, sending OK...\n")
                         self.write(b"OK\n")
                         if not self.wrap_conn():
                             return
@@ -3446,7 +3446,11 @@ class ThreadedTests(unittest.TestCase):
         try_protocol_combo(ssl.PROTOCOL_TLSv1_1, ssl.PROTOCOL_TLSv1_2, False)
 
     @logging_helper.verbose
+<<<<<<< Updated upstream
     def test_starttls(self, log):
+=======
+    def test_starttls(self):
+>>>>>>> Stashed changes
         """Switching from clear text to encrypted and back again."""
         msgs = (b"msg 1", b"MSG 2", b"STARTTLS", b"MSG 3", b"msg 4", b"ENDTLS", b"msg 5", b"msg 6")
 
@@ -3502,7 +3506,11 @@ class ThreadedTests(unittest.TestCase):
                 s.close()
 
     @logging_helper.verbose
+<<<<<<< Updated upstream
     def test_socketserver(self, log):
+=======
+    def test_socketserver(self):
+>>>>>>> Stashed changes
         """Using socketserver to create and manage SSL connections."""
         server = make_https_server(self, certfile=SIGNED_CERTFILE)
         # try to connect
@@ -3527,7 +3535,11 @@ class ThreadedTests(unittest.TestCase):
         self.assertEqual(d1, d2)
 
     @logging_helper.verbose
+<<<<<<< Updated upstream
     def test_asyncore_server(self, log):
+=======
+    def test_asyncore_server(self):
+>>>>>>> Stashed changes
         """Check the example asyncore integration."""
         indata = b"FOO\n"
         server = AsyncoreEchoServer(CERTFILE)
@@ -3554,7 +3566,11 @@ class ThreadedTests(unittest.TestCase):
                 sys.stdout.write(" client:  connection closed.\n")
 
     @logging_helper.verbose
+<<<<<<< Updated upstream
     def test_recv_send(self, log):
+=======
+    def test_recv_send(self):
+>>>>>>> Stashed changes
         """Test recv(), send() and friends."""
         server = ThreadedEchoServer(CERTFILE,
                                     certreqs=ssl.CERT_NONE,
@@ -3991,9 +4007,7 @@ class ThreadedTests(unittest.TestCase):
                 s.connect((HOST, server.port))
                 # get the data
                 cb_data = s.get_channel_binding("tls-unique")
-                if support.verbose:
-                    sys.stdout.write(
-                        " got channel binding data: {0!r}\n".format(cb_data))
+                log(" got channel binding data: {0!r}".format(cb_data))
 
                 # check if it is sane
                 self.assertIsNotNone(cb_data)
@@ -4014,9 +4028,7 @@ class ThreadedTests(unittest.TestCase):
                     server_hostname=hostname) as s:
                 s.connect((HOST, server.port))
                 new_cb_data = s.get_channel_binding("tls-unique")
-                if support.verbose:
-                    sys.stdout.write(
-                        "got another channel binding data: {0!r}\n".format(
+                log("got another channel binding data: {0!r}\n".format(
                             new_cb_data)
                     )
                 # is it really unique
@@ -4031,13 +4043,13 @@ class ThreadedTests(unittest.TestCase):
                 self.assertEqual(peer_data_repr,
                                  repr(new_cb_data).encode("us-ascii"))
 
+    @logging_helper.verbose
     def test_compression(self):
         client_context, server_context, hostname = testing_context()
         stats = server_params_test(client_context, server_context,
                                    chatty=True, connectionchatty=True,
                                    sni_name=hostname)
-        if support.verbose:
-            sys.stdout.write(" got compression: {!r}\n".format(stats['compression']))
+        log(" got compression: {!r}\n".format(stats['compression']))
         self.assertIn(stats['compression'], { None, 'ZLIB', 'RLE' })
 
     @unittest.skipUnless(hasattr(ssl, 'OP_NO_COMPRESSION'),
@@ -4461,16 +4473,17 @@ class TestPostHandshakeAuth(unittest.TestCase):
                 cert_text = s.recv(4096).decode('us-ascii')
                 self.assertIn('Python Software Foundation CA', cert_text)
 
-    def test_pha_required_nocert(self):
+    @logging_helper.verbose
+    def test_pha_required_nocert(self, log):
         client_context, server_context, hostname = testing_context()
         server_context.post_handshake_auth = True
         server_context.verify_mode = ssl.CERT_REQUIRED
         client_context.post_handshake_auth = True
 
         def msg_cb(conn, direction, version, content_type, msg_type, data):
-            if support.verbose and content_type == _TLSContentType.ALERT:
+            if content_type == _TLSContentType.ALERT:
                 info = (conn, direction, version, content_type, msg_type, data)
-                sys.stdout.write(f"TLS: {info!r}\n")
+                log(f"TLS: {info!r}\n")
 
         server_context._msg_callback = msg_cb
         client_context._msg_callback = msg_cb
@@ -4499,7 +4512,11 @@ class TestPostHandshakeAuth(unittest.TestCase):
                     s.recv(1024)
 
     @logging_helper.verbose
+<<<<<<< Updated upstream
     def test_pha_optional(self, log):
+=======
+    def test_pha_optional(self):
+>>>>>>> Stashed changes
         client_context, server_context, hostname = testing_context()
         server_context.post_handshake_auth = True
         server_context.verify_mode = ssl.CERT_REQUIRED
@@ -4521,7 +4538,11 @@ class TestPostHandshakeAuth(unittest.TestCase):
                 self.assertEqual(s.recv(1024), b'TRUE\n')
 
     @logging_helper.verbose
+<<<<<<< Updated upstream
     def test_pha_optional_nocert(self, log):
+=======
+    def test_pha_optional_nocert(self):
+>>>>>>> Stashed changes
         client_context, server_context, hostname = testing_context()
         server_context.post_handshake_auth = True
         server_context.verify_mode = ssl.CERT_OPTIONAL
