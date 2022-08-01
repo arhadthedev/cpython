@@ -2468,6 +2468,9 @@ warnoptions_append(PyConfig *config, PyWideStringList *options,
 }
 
 
+<<< warnoptions_extend - для каждого элемента из второго списка  проверяем, нет ли его уже в списке; если нет - добавляем.
+<<< Сложность старого подхода - квадратичная, нового - линейная. Для константности заменяем массив строк на массив бит, которые можно OR-ить для быстрого покрытия маски включениями.
+
 static PyStatus
 warnoptions_extend(PyConfig *config, PyWideStringList *options,
                    const PyWideStringList *options2)
@@ -2486,7 +2489,7 @@ warnoptions_extend(PyConfig *config, PyWideStringList *options,
 
 
 static PyStatus
-config_init_warnoptions(PyConfig *config,
+config_init_warnoptions(PyConfig *config,                                       <<<<<<<<<<<<<<<<< вот здесь warnoptions_append+warnoptions_extend
                         const PyWideStringList *cmdline_warnoptions,
                         const PyWideStringList *env_warnoptions,
                         const PyWideStringList *sys_warnoptions)
@@ -2732,7 +2735,7 @@ config_read_cmdline(PyConfig *config)
     }
 
     status = config_init_warnoptions(config,
-                                     &cmdline_warnoptions,
+                                     &cmdline_warnoptions,          <<<<<<<<<< эти параметры - вход, который функци последовательно перебирает, подклеивая недублирующиеся ключи
                                      &env_warnoptions,
                                      &sys_warnoptions);
     if (_PyStatus_EXCEPTION(status)) {
@@ -2746,6 +2749,12 @@ done:
     _PyWideStringList_Clear(&env_warnoptions);
     _PyWideStringList_Clear(&sys_warnoptions);
     return status;
+}
+
+static PyStatus
+config_read_warnoptions(PyConfig *config)
+{
+
 }
 
 
@@ -2814,6 +2823,12 @@ PyConfig_SetWideStringList(PyConfig *config, PyWideStringList *list,
 PyStatus
 _PyConfig_Read(PyConfig *config, int compute_path_config)
 {
+    читаем командную строку
+    читаем переменные окружения
+    читаем системные переменные
+    объединить три источника по приоритету
+
+
     PyStatus status;
 
     status = _Py_PreInitializeFromConfig(config, NULL);
@@ -2845,6 +2860,38 @@ _PyConfig_Read(PyConfig *config, int compute_path_config)
     }
 
     status = config_read_cmdline(config);
+
+Разбить на config_read_cmdline и config_read_warnoptions
+
+
+вот эта функция на самом деле читает не телько из командной строки, но и из
+переменных окружения и системных переменных
+Увидел, что чтение конфигурации (_PyConfig_Read) начинается с чтения командной
+строки, которая вызывает функцию вычитывания конфигурации из переменных
+окружения и системных переменных. При этом переменные окружения полноценно
+копируются через _PyWideStringList_Extend, который ничего не расширяет, а просто
+побайтово копирует элементы второго списка в элементы первого, затем склеивает
+источники в один массив в порядке приоритета "командная строка - переменные
+окружения - системные переменные" силами той же функции вычитывания конфигурации.
+
+Всю секцию можно очень сильно упростить, если _PyConfig_Read будет сама сначала
+вызывать разбор командной строки, затем вызыват получение переменных окружения,
+затем вызывать получение системных переменных, эти три функции возвращают список
+сишных указателей, затем _PyConfig_Read вызывает функцию формирования нового
+недублирующегося списка по приоритету источников, и только затем уже
+преобразовывать простые указатели в объекты строк и формировать из них поле
+объекта config. При этом весь этот абзац можно вынести из _PyConfig_Read в
+дочернюю функцию get_warnoptions, возвращающую заведомо корректный PyObject.
+
+
+~~~Как вариант, сишные строки массива warnoptions можно заменить на битовые поля -
+~~~это упростит приоритезацию и исключит любую работу со строками вообще. Это,
+~~~кстати, можно добавить первым шагом рефакторинга, который изменит только самую
+~~~суть самых нижних уровней вызова, без глобального переписыания всего и вся.
+~~~И уже вторым и далее пулл-реквестом можно вытащить из cmdline_warnoptions то,
+~~~что к командной строке не относится.
+Не подходит, каждый элемент имеет вид action:message:category:module:lineno,
+поэтому именно что сливаем с проверкой на уникальность.
     if (_PyStatus_EXCEPTION(status)) {
         goto done;
     }

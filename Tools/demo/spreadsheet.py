@@ -390,12 +390,9 @@ class FormulaCell(BaseCell):
         if self.value is None:
             try:
                 self.value = eval(self.translated, ns)
-            except:
-                exc = sys.exc_info()[0]
-                if hasattr(exc, "__name__"):
-                    self.value = exc.__name__
-                else:
-                    self.value = str(exc)
+            except Exception as why:
+                metaclass = type(why)
+                self.value = getattr(metaclass, "__name__", str(metaclass))
         return self.value
 
     def format(self):
