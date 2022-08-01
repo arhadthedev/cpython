@@ -313,14 +313,6 @@ StreamWriter
 
       .. versionadded:: 3.11
 
-   .. coroutinemethod:: shutdown_tls()
-
-      Downgrade a TSL connection back to plain text.
-
-      If the connection is not in the upgraded state, do nothing.
-
-      .. versionadded:: 3.11
-
    .. method:: is_closing()
 
       Return ``True`` if the stream is closed or in the process of

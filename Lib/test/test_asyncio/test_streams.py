@@ -707,6 +707,10 @@ class StreamTests(test_utils.TestCase):
         self.assertEqual(messages, [])
 
     @unittest.skipIf(ssl is None, 'No ssl module')
+    def test_tls(self):
+        
+
+    @unittest.skipIf(ssl is None, 'No ssl module')
     def test_start_tls(self):
 
         class MyServer:

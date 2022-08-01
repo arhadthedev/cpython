@@ -1259,6 +1259,43 @@ class BaseEventLoop(events.AbstractEventLoop):
 
         return ssl_protocol._app_transport
 
+    async def shutdown_tls(self, transport, protocol):
+        """Downgrade a transport to plain text.
+
+        Return a new transport that *protocol* should start using
+        immediately.
+        """
+        if not transport.get_extra_info('sslcontext'):
+            raise TypeError(
+                'the transport does not use TLS; call loop.start_tls first')
+
+        waiter = self.create_future()
+        ssl_protocol = sslproto.SSLProtocol(
+            self, protocol, sslcontext, waiter,
+            server_side, server_hostname,
+            ssl_handshake_timeout=ssl_handshake_timeout,
+            ssl_shutdown_timeout=ssl_shutdown_timeout,
+            call_connection_made=False)
+
+        # Pause early so that "ssl_protocol.data_received()" doesn't
+        # have a chance to get called before "ssl_protocol.connection_made()".
+        transport.pause_reading()
+
+        transport.set_protocol(ssl_protocol)
+        conmade_cb = self.call_soon(ssl_protocol.connection_made, transport)
+        resume_cb = self.call_soon(transport.resume_reading)
+
+        try:
+            await waiter
+        except BaseException:
+            transport.close()
+            conmade_cb.cancel()
+            resume_cb.cancel()
+            raise
+
+        return ssl_protocol._app_transport
+    
+
     async def create_datagram_endpoint(self, protocol_factory,
                                        local_addr=None, remote_addr=None, *,
                                        family=0, proto=0, flags=0,

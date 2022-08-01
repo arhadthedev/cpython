@@ -392,6 +392,17 @@ class StreamWriter:
         self._transport = new_transport
         protocol._replace_writer(self)
 
+    async def shutdown_tls(self):
+        """Downgrade an existing stream-based connection to plain text."""
+        if not self._over_ssl:
+            return
+        protocol = self._protocol
+        await self.drain()
+        old_transport = await self._loop.shutdown_tls()
+        self._over_ssl = False
+        self._transport = old_transport
+        protocol._replace_writer(self)
+
 
 class StreamReader:
 
