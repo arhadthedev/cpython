@@ -2747,19 +2747,20 @@ def _adjust_cli_sys_path():
 
 
 def cli():
-    """Command-line interface (looks at sys.argv to decide what to do)."""
-    import getopt
-    class BadUsage(Exception): pass
-
+    import argparse
     _adjust_cli_sys_path()
+    parser = ArgumentParser(description='Python documentation tool')
+    parser.add_argument('-b', action='store_true', help='')
+    parser.add_argument('-k', '--keyword', type=, help='')
+    parser.add_argument('-n', '--hostname', type=int, help='')
+    parser.add_argument('-p', '--port', type=int, help='')
+    parser.add_argument('-w', '--write', action='store_true', help='')
+    parser.add_argument('name', nargs='+', help='')
+    arguments = parser.parse_args()
+
+
 
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'bk:n:p:w')
-        writing = False
-        start_server = False
-        open_browser = False
-        port = 0
-        hostname = 'localhost'
         for opt, val in opts:
             if opt == '-b':
                 start_server = True
@@ -2776,12 +2777,12 @@ def cli():
                 start_server = True
                 hostname = val
 
-        if start_server:
+        start_server = arguments['hostname'] or arguments['port']
+        if arguments['b'] or start_server:
             browse(port, hostname=hostname, open_browser=open_browser)
             return
 
-        if not args: raise BadUsage
-        for arg in args:
+        for arg in arguments['name']:
             if ispath(arg) and not os.path.exists(arg):
                 print('file %r does not exist' % arg)
                 sys.exit(1)

@@ -1757,44 +1757,30 @@ def help():
     import pydoc
     pydoc.pager(__doc__)
 
-_usage = """\
-usage: pdb.py [-c command] ... [-m module | pyfile] [arg] ...
-
-Debug the Python program given by pyfile. Alternatively,
-an executable module or package to debug can be specified using
-the -m switch.
-
+epilog = """\
 Initial commands are read from .pdbrc files in your home directory
-and in the current directory, if they exist.  Commands supplied with
--c are executed after commands from .pdbrc files.
+and in the current directory, if they exist.
 
 To let the script run until an exception occurs, use "-c continue".
 To let the script run up to a given line X in the debugged file, use
 "-c 'until X'"."""
 
 
-def main():
-    import getopt
-
-    opts, args = getopt.getopt(sys.argv[1:], 'mhc:', ['help', 'command='])
-
-    if not args:
-        print(_usage)
-        sys.exit(2)
-
-    if any(opt in ['-h', '--help'] for opt, optarg in opts):
-        print(_usage)
-        sys.exit()
-
-    commands = [optarg for opt, optarg in opts if opt in ['-c', '--command']]
-
-    module_indicated = any(opt in ['-m'] for opt, optarg in opts)
-    cls = ModuleTarget if module_indicated else ScriptTarget
-    target = cls(args[0])
+def _cli():
+    from argparse import ArgumentParser
+    parser = ArgumentParser(description='debug Python scripts given by pyfile '
+                            'or -m module name', epilog=epilog)
+    parser.add_argument('-c', '--command', help='extra commands run after .pdbrc content')
+    parser.add_argument('-m', '--module', action='store_true', help='path is an -m module name')
+    parser.add_argument('path', help='debugged program')
+    parser.add_argument('arg', nargs='*', help='content of sys.argv')
+    arguments = parser.parse_args()
+    cls = ModuleTarget if 'module' in arguments else ScriptTarget
+    target = cls(arguments['path'])
 
     target.check()
 
-    sys.argv[:] = args      # Hide "pdb.py" and pdb options from argument list
+    sys.argv[:] = arguments[arg]      # Hide "pdb.py" and pdb options from argument list
 
     # Note on saving/restoring sys.argv: it's a good idea when sys.argv was
     # modified by the script being debugged. It's a bad idea when it was
@@ -1830,5 +1816,4 @@ def main():
 
 # When invoked as main program, invoke the debugger on a script
 if __name__ == '__main__':
-    import pdb
-    pdb.main()
+    _cli()

@@ -194,35 +194,32 @@ def unhex(s):
 
 def main():
     import sys
-    import getopt
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], 'td')
-    except getopt.error as msg:
-        sys.stdout = sys.stderr
-        print(msg)
-        print("usage: quopri [-t | -d] [file] ...")
-        print("-t: quote tabs")
-        print("-d: decode; default encode")
-        sys.exit(2)
-    deco = False
-    tabs = False
-    for o, a in opts:
-        if o == '-t': tabs = True
-        if o == '-d': deco = True
-    if tabs and deco:
-        sys.stdout = sys.stderr
-        print("-t and -d are mutually exclusive")
-        sys.exit(2)
+    from argparse import ArgumentParser
+    parser = ArgumentParser(description='convert to/from quoted-printable transport encoding as per RFC 1521')
+    ops = parser.add_mutually_exclusive_group()
+    ops.add_argument('-t', '--tabs', action='store_true', help='quote tabs')
+    ops.add_argument('-d', '--decode', action='store_true', help='decode')
+    parser.add_argument('file', nargs='+', help='input path or "-" for stdin')
+    arguments = parser.parse_args()
+
     if not args: args = ['-']
-    sts = 0
+    try:
     for file in args:
+        with open(file, 'rb') as fp (или незакрываемый stdin при имени файла '-'):
+            if arguments['decode']:
+                decode(fp, sys.stdout.buffer)
+            else:
+                encode(fp, sys.stdout.buffer, arguments['tabs'])
+    except OSError as msg:
+        sys.exit(f"{file}: can't open ({msg})")
+
         if file == '-':
             fp = sys.stdin.buffer
         else:
             try:
                 fp = open(file, "rb")
             except OSError as msg:
-                sys.stderr.write("%s: can't open (%s)\n" % (file, msg))
+
                 sts = 1
                 continue
         try:

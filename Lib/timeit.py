@@ -238,7 +238,7 @@ def repeat(stmt="pass", setup="pass", timer=default_timer,
     """Convenience function to create Timer object and call repeat method."""
     return Timer(stmt, setup, timer, globals).repeat(repeat, number)
 
-def main(args=None, *, _wrap_timer=None):
+def _cli(args=None, *, _wrap_timer=None):
     """Main program, used when run as a script.
 
     The optional 'args' argument specifies the command line to be parsed,
@@ -373,4 +373,4 @@ def main(args=None, *, _wrap_timer=None):
     return None
 
 if __name__ == "__main__":
-    sys.exit(main())
+    _cli()

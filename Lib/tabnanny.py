@@ -28,35 +28,17 @@ if not hasattr(tokenize, 'NL'):
 
 __all__ = ["check", "NannyNag", "process_tokens"]
 
-verbose = 0
-filename_only = 0
 
-def errprint(*args):
-    sep = ""
-    for arg in args:
-        sys.stderr.write(sep + str(arg))
-        sep = " "
-    sys.stderr.write("\n")
+def _cli():
+    from argparse import ArgumentParser
+    parser = ArgumentParser(description='detect ambiguous indentation')
+    parser.add_argument('-q', action='store_true', help='print file name only')
+    parser.add_argument('-v', action='store_true', help='')
+    parser.add_argument('path', nargs='+', help='file or directory to scan')
+    arguments = parser.parse_args()
+    for arg in arguments['path']:
+        check(arg, arguments['v'], arguments['q'])
 
-def main():
-    import getopt
-
-    global verbose, filename_only
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], "qv")
-    except getopt.error as msg:
-        errprint(msg)
-        return
-    for o, a in opts:
-        if o == '-q':
-            filename_only = filename_only + 1
-        if o == '-v':
-            verbose = verbose + 1
-    if not args:
-        errprint("Usage:", sys.argv[0], "[-v] file_or_directory ...")
-        return
-    for arg in args:
-        check(arg)
 
 class NannyNag(Exception):
     """
@@ -72,7 +54,8 @@ class NannyNag(Exception):
     def get_line(self):
         return self.line
 
-def check(file):
+
+def check(file, verbose, filename_only):
     """check(file_or_dir)
 
     If file_or_dir is a directory and not a symbolic link, then recursively
@@ -97,22 +80,19 @@ def check(file):
     try:
         f = tokenize.open(file)
     except OSError as msg:
-        errprint("%r: I/O Error: %s" % (file, msg))
-        return
+        sys.exit(f"{file}: I/O Error: {msg}")
 
-    if verbose > 1:
+    if verbose:
         print("checking %r ..." % file)
 
     try:
         process_tokens(tokenize.generate_tokens(f.readline))
 
     except tokenize.TokenError as msg:
-        errprint("%r: Token Error: %s" % (file, msg))
-        return
+        sys.exit(f"{file}: Token Error: {msg}")
 
     except IndentationError as msg:
-        errprint("%r: Indentation Error: %s" % (file, msg))
-        return
+        sys.exit(f"{file}: Indentation Error: {msg}")
 
     except NannyNag as nag:
         badline = nag.get_lineno()
@@ -330,4 +310,4 @@ def process_tokens(tokens):
 
 
 if __name__ == '__main__':
-    main()
+    _cli()

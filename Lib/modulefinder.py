@@ -600,60 +600,33 @@ class ModuleFinder:
         return co.replace(co_consts=tuple(consts), co_filename=new_filename)
 
 
-def test():
-    # Parse command line
-    import getopt
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], "dmp:qx:")
-    except getopt.error as msg:
-        print(msg)
-        return
-
-    # Process options
-    debug = 1
-    domods = 0
-    addpath = []
-    exclude = []
-    for o, a in opts:
-        if o == '-d':
-            debug = debug + 1
-        if o == '-m':
-            domods = 1
-        if o == '-p':
-            addpath = addpath + a.split(os.pathsep)
-        if o == '-q':
-            debug = 0
-        if o == '-x':
-            exclude.append(a)
-
-    # Provide default arguments
-    if not args:
-        script = "hello.py"
-    else:
-        script = args[0]
+def _cli():
+    from argparse import ArgumentParser
+    parser = ArgumentParser(description='list modules imported by a script')
+    parser.add_argument('-d', '--debug', action='store_true', help='')
+    parser.add_argument('-q', '--quiet', action='store_true', help='')
+    parser.add_argument('-m', '--domods', action='store_true', help='')
+    parser.add_argument('-p', '--path', nargs='*', help='path to search for modules; if not specified, sys.path is used')
+    parser.add_argument('-x', '--exclude', nargs='*', help='')
+    parser.add_argument('script', default='hello.py', help='path to a script')
+    arguments = parser.parse_args()
 
     # Set the path based on sys.path and the script directory
     path = sys.path[:]
     path[0] = os.path.dirname(script)
-    path = addpath + path
-    if debug > 1:
+    path = arguments['path'] + path
+    if arguments['debug']:
         print("path:")
         for item in path:
             print("   ", repr(item))
 
     # Create the module finder and turn its crank
-    mf = ModuleFinder(path, debug, exclude)
-    for arg in args[1:]:
-        if arg == '-m':
-            domods = 1
-            continue
-        if domods:
-            if arg[-2:] == '.*':
-                mf.import_hook(arg[:-2], None, ["*"])
-            else:
-                mf.import_hook(arg)
-        else:
-            mf.load_file(arg)
+    mf = ModuleFinder(arguments['path'], arguments['debug'], arguments['exclude'])
+    if arguments['domods']
+        for path in arguments['domods']:
+            mf.import_hook(path, None, ["*"] if path == '.*' else None)
+    else:
+        mf.load_file(arg)
     mf.run_script(script)
     mf.report()
     return mf  # for -i debugging
@@ -661,6 +634,6 @@ def test():
 
 if __name__ == '__main__':
     try:
-        mf = test()
+        mf = _cli()
     except KeyboardInterrupt:
         print("\n[interrupted]")

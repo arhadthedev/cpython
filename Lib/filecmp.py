@@ -298,13 +298,14 @@ def _filter(flist, skip):
 # Demonstration and testing.
 #
 def demo():
-    import sys
-    import getopt
-    options, args = getopt.getopt(sys.argv[1:], 'r')
-    if len(args) != 2:
-        raise getopt.GetoptError('need exactly two args', None)
-    dd = dircmp(args[0], args[1])
-    if ('-r', '') in options:
+    from argparse import ArgumentParser
+    parser = ArgumentParser(description='compare directories and files')
+    parser.add_argument('-r', action='store_true', help='recursive comparison')
+    parser.add_argument('dir_a', help='one side of the comparison')
+    parser.add_argument('dir_b', help='another side of the comparison')
+    arguments = parser.parse_args()
+    dd = dircmp(arguments['dir_a'], arguments['dir_b'])
+    if arguments['r']:
         dd.report_full_closure()
     else:
         dd.report()

@@ -1544,32 +1544,29 @@ def Time2Internaldate(date_time):
 
 if __name__ == '__main__':
 
-    # To test: invoke either as 'python imaplib.py [IMAP4_server_hostname]'
-    # or 'python imaplib.py -s "rsh IMAP4_server_hostname exec /etc/rimapd"'
-    # to test the IMAP4_stream class
+    epilog = ("to test, invoke either as 'python imaplib.py "
+              "[IMAP4_server_hostname]' or 'python imaplib.py -s \"rsh "
+              "IMAP4_server_hostname exec /etc/rimapd\"' to test the "
+              "IMAP4_stream class")
 
-    import getopt, getpass
+    from argparse import ArgumentParser
+    import getpass
 
     try:
-        optlist, args = getopt.getopt(sys.argv[1:], 'd:s:')
+        parser = ArgumentParser(description='test IMAP4rev1 servers',
+                                epilog=epilog)
+        parser.add_argument('host', type=int, help='server hostname')
+        parser.add_argument('-d', type=int, help='debug output level')
+        parser.add_argument('-s', help=('execute a command line and attach '
+                            'IMAP4_stream to it'))
+        arguments = parser.parse_args()
+
     except getopt.error as val:
         optlist, args = (), ()
 
-    stream_command = None
-    for opt,val in optlist:
-        if opt == '-d':
-            Debug = int(val)
-        elif opt == '-s':
-            stream_command = val
-            if not args: args = (stream_command,)
-
-    if not args: args = ('',)
-
-    host = args[0]
-
     USER = getpass.getuser()
-    PASSWD = getpass.getpass("IMAP password for %s on %s: " % (USER, host or "localhost"))
-
+    host = arguments['host'] or "localhost"
+    PASSWD = getpass.getpass(f"IMAP password for {USER} on {host}: ")
     test_mesg = 'From: %(user)s@localhost%(lf)sSubject: IMAP4 test%(lf)s%(lf)sdata...%(lf)s' % {'user':USER, 'lf':'\n'}
     test_seq1 = (
     ('login', (USER, PASSWD)),
@@ -1606,10 +1603,7 @@ if __name__ == '__main__':
         return dat
 
     try:
-        if stream_command:
-            M = IMAP4_stream(stream_command)
-        else:
-            M = IMAP4(host)
+        M = IMAP4_stream(arguments['s']) if arguments['s'] else IMAP4(host)
         if M.state == 'AUTH':
             test_seq1 = test_seq1[1:]   # Login not needed
         M._mesg('PROTOCOL_VERSION = %s' % M.PROTOCOL_VERSION)
@@ -1640,7 +1634,7 @@ if __name__ == '__main__':
     except:
         print('\nTests failed.')
 
-        if not Debug:
+        if not arguments['d']:
             print('''
 If you would like to see debugging output,
 try: %s -d5

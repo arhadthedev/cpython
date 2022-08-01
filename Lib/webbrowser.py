@@ -707,29 +707,22 @@ if sys.platform == 'darwin':
             return not rc
 
 
-def main():
-    import getopt
-    usage = """Usage: %s [-n | -t] url
-    -n: open new window
-    -t: open new tab""" % sys.argv[0]
-    try:
-        opts, args = getopt.getopt(sys.argv[1:], 'ntd')
-    except getopt.error as msg:
-        print(msg, file=sys.stderr)
-        print(usage, file=sys.stderr)
-        sys.exit(1)
-    new_win = 0
-    for o, a in opts:
-        if o == '-n': new_win = 1
-        elif o == '-t': new_win = 2
-    if len(args) != 1:
-        print(usage, file=sys.stderr)
-        sys.exit(1)
-
-    url = args[0]
-    open(url, new_win)
-
-    print("\a")
+def _cli():
+    from argparse import ArgumentParser
+    parser = ArgumentParser(description='open a page in a  web browser')
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument('-n', action='store_true', help='open new window')
+    modes.add_argument('-t', action='store_true', help='open new tab')
+    parser.add_argument('url', nargs='+', help='urls to open')
+    arguments = parser.parse_args()
+    for url in arguments['url']:
+        if arguments['n']:
+            mode = 1
+        elif arguments['t']:
+            mode = 2
+        else:
+            mode = 0
+        open(url, mode)
 
 if __name__ == "__main__":
-    main()
+    _cli()
