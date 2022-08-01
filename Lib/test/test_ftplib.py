@@ -147,7 +147,7 @@ class DummyFTPHandler(asynchat.async_chat):
                 self.dtp = self.dtp_handler(s, baseclass=self)
                 self.push('200 active data connection established')
 
-            case 'epsv':
+            case 'epsv',:
                 with socket.create_server((self.socket.getsockname()[0], 0),
                                           family=socket.AF_INET6) as sock:
                     sock.settimeout(TIMEOUT)
@@ -164,12 +164,12 @@ class DummyFTPHandler(asynchat.async_chat):
             case 'mkd', argument:
                 self.push(f'257 "{argument}"')
 
-            case 'mlsd':
+            case 'mlsd',:
                 self.push('125 mlsd ok')
                 self.dtp.push(MLSD_DATA)
                 self.dtp.close_when_done()
 
-            case 'nlst':
+            case 'nlst',:
                 self.push('125 nlst ok')
                 self.dtp.push(NLST_DATA)
                 self.dtp.close_when_done()
@@ -192,15 +192,15 @@ class DummyFTPHandler(asynchat.async_chat):
                 self.dtp = self.dtp_handler(s, baseclass=self)
                 self.push('200 active data connection established')
 
-            case 'quit':
+            case 'quit',:
                 self.push('221 quit ok')
                 self.close()
-
+                
             case 'rest', argument:
                 self.rest = argument
                 self.push('350 rest ok')
 
-            case 'retr', _:
+            case 'retr', *_:
                 self.push('125 retr ok')
                 offset = 0 if self.rest is None else int(self.rest)
                 self.dtp.push(self.next_retr_data[offset:])
@@ -223,7 +223,7 @@ class DummyFTPHandler(asynchat.async_chat):
             case 'noop' | 'opts' | 'type' as command, *_:
                 self.push(f'200 {command} ok')
 
-            case 'abor':
+            case 'abor',:
                 self.push('226 abor ok')
 
             case 'pass' | 'acct' as command, _:
@@ -232,8 +232,8 @@ class DummyFTPHandler(asynchat.async_chat):
             case 'cwd' | 'dele' | 'rmd' | 'rnto' as command, _:
                 self.push(f'250 {command} ok')
 
-            case 'pwd':
-                self.push('257 pwd ok')
+            case 'pwd',:
+                self.push('257 "pwd ok"')
 
             case 'user', _:
                 self.push('331 user ok')
@@ -452,7 +452,7 @@ if ssl is not None:
                     self.push('234 AUTH TLS successful')
                     self.secure_connection()
 
-                case 'ccc':
+                case 'ccc',:
                     self.push('220 Reverting back to clear-text')
                     self._ccc = True
                     self._do_ssl_shutdown()
