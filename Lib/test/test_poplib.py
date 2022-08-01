@@ -3,6 +3,7 @@
 # Modified by Giampaolo Rodola' to give poplib.POP3 and poplib.POP3_SSL
 # a real test suite
 
+import asyncio
 import poplib
 import socket
 import os
@@ -10,22 +11,15 @@ import errno
 import threading
 
 import unittest
-from unittest import TestCase, skipUnless
+from unittest import IsolatedAsyncioTestCase, TestCase, skipUnless
 from test import support as test_support
 from test.support import hashlib_helper
 from test.support import socket_helper
 from test.support import threading_helper
-from test.support import warnings_helper
-
-
-asynchat = warnings_helper.import_deprecated('asynchat')
-asyncore = warnings_helper.import_deprecated('asyncore')
 
 
 test_support.requires_working_socket(module=True)
 
-HOST = socket_helper.HOST
-PORT = 0
 
 SUPPORTS_SSL = False
 if hasattr(poplib, 'POP3_SSL'):
@@ -50,91 +44,73 @@ line3\r\n\
 .\r\n"""
 
 
-class DummyPOP3Handler(asynchat.async_chat):
-
+async def _on_pop3_client(reader, writer):
     CAPAS = {'UIDL': [], 'IMPLEMENTATION': ['python-testlib-pop-server']}
-    enable_UTF8 = False
+    utf_mode = False
+    tls_active = False
+    tls_starting = False
 
-    def __init__(self, conn):
-        asynchat.async_chat.__init__(self, conn)
-        self.set_terminator(b"\r\n")
-        self.in_buffer = []
-        self.push('+OK dummy pop3 server ready. <timestamp>')
-        self.tls_active = False
-        self.tls_starting = False
+    handlers = {}
 
-    def collect_incoming_data(self, data):
-        self.in_buffer.append(data)
+    def cmd_echo(cmd_arguments, reply):
+        reply(b' '.join(cmd_arguments))
 
-    def found_terminator(self):
-        line = b''.join(self.in_buffer)
-        line = str(line, 'ISO-8859-1')
-        self.in_buffer = []
-        cmd = line.split(' ')[0].lower()
-        space = line.find(' ')
-        if space != -1:
-            arg = line[space + 1:]
-        else:
-            arg = ""
-        if hasattr(self, 'cmd_' + cmd):
-            method = getattr(self, 'cmd_' + cmd)
-            method(arg)
-        else:
-            self.push('-ERR unrecognized POP3 command "%s".' %cmd)
+    handlers['echo'] = cmd_echo
 
-    def handle_error(self):
-        raise
+    def cmd_user(cmd_arguments, reply):
+        user = cmd_arguments[0] if cmd_arguments else None
+        correct = (user == b'guido')
+        reply(b'+OK password required' if correct else b'-ERR no such user')
 
-    def push(self, data):
-        asynchat.async_chat.push(self, data.encode("ISO-8859-1") + b'\r\n')
+    handlers['user'] = cmd_user
 
-    def cmd_echo(self, arg):
-        # sends back the received string (used by the test suite)
-        self.push(arg)
+    def cmd_pass(cmd_arguments, reply):
+        password = cmd_arguments[0] if cmd_arguments else None
+        correct = (password == b'python')
+        reply(b'+OK 10 messages' if correct else b'-ERR wrong password')
 
-    def cmd_user(self, arg):
-        if arg != "guido":
-            self.push("-ERR no such user")
-        self.push('+OK password required')
+    handlers['pass'] = cmd_pass
 
-    def cmd_pass(self, arg):
-        if arg != "python":
-            self.push("-ERR wrong password")
-        self.push('+OK 10 messages')
+    def cmd_stat(cmd_arguments, reply):
+        reply(b'+OK 10 100')
 
-    def cmd_stat(self, arg):
-        self.push('+OK 10 100')
+    handlers['stat'] = cmd_stat
 
-    def cmd_list(self, arg):
+    def cmd_list(cmd_arguments, reply):
         if arg:
             self.push('+OK %s %s' % (arg, arg))
         else:
             self.push('+OK')
             asynchat.async_chat.push(self, LIST_RESP)
 
-    cmd_uidl = cmd_list
+    handlers['list'] = cmd_list
+    handlers['uidl'] = cmd_list
 
-    def cmd_retr(self, arg):
+    def cmd_retr(cmd_arguments, reply):
         self.push('+OK %s bytes' %len(RETR_RESP))
         asynchat.async_chat.push(self, RETR_RESP)
 
-    cmd_top = cmd_retr
+    handlers['retr'] = cmd_retr
+    handlers['top'] = cmd_retr
 
-    def cmd_dele(self, arg):
-        self.push('+OK message marked for deletion.')
+    def cmd_dele(cmd_arguments, reply):
+        response.write(b'+OK message marked for deletion.')
 
-    def cmd_noop(self, arg):
-        self.push('+OK done nothing.')
+     handlers['dele'] = cmd_dele
 
-    def cmd_rpop(self, arg):
-        self.push('+OK done nothing.')
+    def return_ok_done_nothing(cmd_arguments, reply):
+        response.write(b'+OK done nothing.')
 
-    def cmd_apop(self, arg):
-        self.push('+OK done nothing.')
+    handlers['noop'] = return_ok_done_nothing
+    handlers['rpop'] = return_ok_done_nothing
+    handlers['apop'] = return_ok_done_nothing
 
-    def cmd_quit(self, arg):
-        self.push('+OK closing.')
-        self.close_when_done()
+    def cmd_quit(cmd_arguments, reply):
+        reply(b'+OK message marked for deletion.')
+        reply('+OK closing.')
+        return True
+
+    handlers['quit'] = cmd_quit
 
     def _get_capas(self):
         _capas = dict(self.CAPAS)
@@ -142,28 +118,32 @@ class DummyPOP3Handler(asynchat.async_chat):
             _capas['STLS'] = []
         return _capas
 
-    def cmd_capa(self, arg):
-        self.push('+OK Capability list follows')
+    def cmd_capa(cmd_arguments, reply):
+        reply('+OK Capability list follows')
         if self._get_capas():
             for cap, params in self._get_capas().items():
                 _ln = [cap]
                 if params:
                     _ln.extend(params)
-                self.push(' '.join(_ln))
+                reply(' '.join(_ln))
         self.push('.')
 
-    def cmd_utf8(self, arg):
-        self.push('+OK I know RFC6856'
-                  if self.enable_UTF8
-                  else '-ERR What is UTF8?!')
+    handlers['capa'] = cmd_capa
+
+    def cmd_utf8(cmd_arguments, reply):
+        reply('+OK I know RFC6856' if self.utf_mode else '-ERR What is UTF8?!')
+
+    handlers['utf8'] = cmd_utf8
 
     if SUPPORTS_SSL:
 
-        def cmd_stls(self, arg):
+        def cmd_stls(cmd_arguments, reply):
             if self.tls_active is False:
-                self.push('+OK Begin TLS negotiation')
+                reply('+OK Begin TLS negotiation')
                 context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
                 context.load_cert_chain(CERTFILE)
+                writer.start_tls(context)
+
                 tls_sock = context.wrap_socket(self.socket,
                                                server_side=True,
                                                do_handshake_on_connect=False,
@@ -175,7 +155,9 @@ class DummyPOP3Handler(asynchat.async_chat):
                 self.in_buffer = []
                 self._do_tls_handshake()
             else:
-                self.push('-ERR Command not permitted when TLS active')
+                reply('-ERR Command not permitted when TLS active')
+
+        handlers['stls'] = cmd_stls
 
         def _do_tls_handshake(self):
             try:
@@ -207,55 +189,72 @@ class DummyPOP3Handler(asynchat.async_chat):
                 except ssl.SSLEOFError:
                     self.handle_close()
 
-class DummyPOP3Server(asyncore.dispatcher, threading.Thread):
 
-    handler = DummyPOP3Handler
+    def unknown_cmd_handler(cmd_arguments, reply):
+        reply(b'-ERR unrecognized POP3 command\r\n')
 
-    def __init__(self, address, af=socket.AF_INET):
-        threading.Thread.__init__(self)
-        asyncore.dispatcher.__init__(self)
-        self.daemon = True
-        self.create_socket(af, socket.SOCK_STREAM)
-        self.bind(address)
-        self.listen(5)
-        self.active = False
-        self.active_lock = threading.Lock()
-        self.host, self.port = self.socket.getsockname()[:2]
-        self.handler_instance = None
+    with writer:
+        writer.write(b'+OK dummy pop3 server ready. <timestamp>\r\n')
+        await writer.drain()
 
-    def start(self):
-        assert not self.active
-        self.__flag = threading.Event()
-        threading.Thread.start(self)
-        self.__flag.wait()
+        wait_next_cmd = True
+        while wait_next_cmd and not reader.at_eof():
+            request = await reader.readline()
+            cmd, *cmd_args = request.split(b' ')
+            wait_next_cmd = command_handlers.get(cmd, unknown_cmd_handler)(cmd_args)
 
-    def run(self):
-        self.active = True
-        self.__flag.set()
-        try:
-            while self.active and asyncore.socket_map:
-                with self.active_lock:
-                    asyncore.loop(timeout=0.1, count=1)
-        finally:
-            asyncore.close_all(ignore_all=True)
 
-    def stop(self):
-        assert self.active
-        self.active = False
-        self.join()
 
-    def handle_accepted(self, conn, addr):
-        self.handler_instance = self.handler(conn)
 
-    def handle_connect(self):
-        self.close()
-    handle_read = handle_connect
+                                    class DummyPOP3Server(asyncore.dispatcher, threading.Thread):
 
-    def writable(self):
-        return 0
+                                        handler = DummyPOP3Handler
 
-    def handle_error(self):
-        raise
+                                        def __init__(self, address, af=socket.AF_INET):
+                                            threading.Thread.__init__(self)
+                                            asyncore.dispatcher.__init__(self)
+                                            self.daemon = True
+                                            self.create_socket(af, socket.SOCK_STREAM)
+                                            self.bind(address)
+                                            self.listen(5)
+                                            self.active = False
+                                            self.active_lock = threading.Lock()
+                                            self.host, self.port = self.socket.getsockname()[:2]
+                                            self.handler_instance = None
+
+                                        def start(self):
+                                            assert not self.active
+                                            self.__flag = threading.Event()
+                                            threading.Thread.start(self)
+                                            self.__flag.wait()
+
+                                        def run(self):
+                                            self.active = True
+                                            self.__flag.set()
+                                            try:
+                                                while self.active and asyncore.socket_map:
+                                                    with self.active_lock:
+                                                        asyncore.loop(timeout=0.1, count=1)
+                                            finally:
+                                                asyncore.close_all(ignore_all=True)
+
+                                        def stop(self):
+                                            assert self.active
+                                            self.active = False
+                                            self.join()
+
+                                        def handle_accepted(self, conn, addr):
+                                            self.handler_instance = self.handler(conn)
+
+                                        def handle_connect(self):
+                                            self.close()
+                                        handle_read = handle_connect
+
+                                        def writable(self):
+                                            return 0
+
+                                        def handle_error(self):
+                                            raise
 
 
 class TestPOP3Class(TestCase):
@@ -348,11 +347,11 @@ class TestPOP3Class(TestCase):
         self.client.uidl('foo')
 
     def test_utf8_raises_if_unsupported(self):
-        self.server.handler.enable_UTF8 = False
+        self.server.handler.utf8_mode = False
         self.assertRaises(poplib.error_proto, self.client.utf8)
 
     def test_utf8(self):
-        self.server.handler.enable_UTF8 = True
+        self.server.handler.utf8_mode = True
         expected = b'+OK I know RFC6856'
         result = self.client.utf8()
         self.assertEqual(result, expected)
