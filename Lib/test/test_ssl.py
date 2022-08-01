@@ -10,6 +10,7 @@ from test.support import socket_helper
 from test.support import threading_helper
 from test.support import warnings_helper
 import socket
+from socketserver import StreamRequestHandler, ThreadingTCPServer
 import select
 import time
 import enum
@@ -18,7 +19,6 @@ import os
 import errno
 import pprint
 import urllib.request
-import threading
 import traceback
 import weakref
 import platform
@@ -2398,9 +2398,9 @@ def _test_get_server_certificate_fail(test, host, port):
 
 from test.ssl_servers import make_https_server
 
-class ThreadedEchoServer(threading.Thread):
+class ThreadedEchoServer(ThreadingTCPServer):
 
-    class ConnectionHandler(threading.Thread):
+    class ConnectionHandler(StreamRequestHandler):
 
         """A mildly complicated class, because we want it to work both
         with and without the SSL wrapper around the socket connection, so
@@ -2496,7 +2496,11 @@ class ThreadedEchoServer(threading.Thread):
             else:
                 self.sock.close()
 
-        def run(self):
+        def log(self, message):
+            if support.verbose and self.server.connectionchatty:
+                sys.stdout.write(f" server: {message}\n")
+
+        def handle(self):
             self.running = True
             if not self.server.starttls_server:
                 if not self.wrap_conn():
@@ -2519,34 +2523,28 @@ class ThreadedEchoServer(threading.Thread):
                             self.sslconn = None
                         self.close()
                     elif stripped == b'over':
-                        if support.verbose and self.server.connectionchatty:
-                            sys.stdout.write(" server: client closed connection\n")
+                        log("client closed connection")
                         self.close()
                         return
                     elif (self.server.starttls_server and
                           stripped == b'STARTTLS'):
-                        if support.verbose and self.server.connectionchatty:
-                            sys.stdout.write(" server: read STARTTLS from client, sending OK...\n")
+                        log("read STARTTLS from client, sending OK...")
                         self.write(b"OK\n")
                         if not self.wrap_conn():
                             return
                     elif (self.server.starttls_server and self.sslconn
                           and stripped == b'ENDTLS'):
-                        if support.verbose and self.server.connectionchatty:
-                            sys.stdout.write(" server: read ENDTLS from client, sending OK...\n")
+                        log("read ENDTLS from client, sending OK...")
                         self.write(b"OK\n")
                         self.sock = self.sslconn.unwrap()
                         self.sslconn = None
-                        if support.verbose and self.server.connectionchatty:
-                            sys.stdout.write(" server: connection is now unencrypted...\n")
+                        log("connection is now unencrypted")
                     elif stripped == b'CB tls-unique':
-                        if support.verbose and self.server.connectionchatty:
-                            sys.stdout.write(" server: read CB tls-unique from client, sending our CB data...\n")
+                        log("read CB tls-unique from client, sending our CB data...")
                         data = self.sslconn.get_channel_binding("tls-unique")
                         self.write(repr(data).encode("us-ascii") + b"\n")
                     elif stripped == b'PHA':
-                        if support.verbose and self.server.connectionchatty:
-                            sys.stdout.write(" server: initiating post handshake auth\n")
+                        log("initiating post handshake auth")
                         try:
                             self.sslconn.verify_client_post_handshake()
                         except ssl.SSLError as e:
@@ -2581,9 +2579,7 @@ class ThreadedEchoServer(threading.Thread):
                             # OpenSSL 1.1.1 sometimes raises
                             # ConnectionResetError when connection is not
                             # shut down gracefully.
-                            print(
-                                f" Connection reset by peer: {self.addr}"
-                            )
+                            log(f"connection reset by peer {self.addr}")
                         else:
                             handle_error("Test server failure:\n")
                     try:
