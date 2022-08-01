@@ -2789,12 +2789,19 @@ class pid_t_converter(CConverter):
     type = 'pid_t'
     format_unit = '" _Py_PARSE_PID "'
 
+    def parse_arg(self, argname, displayname):
+        return """
+            {paramname} = PyLong_AsPid({argname});
+            if ({paramname} == -1 && PyErr_Occurred()) {{{{
+                goto exit;
+            }}}}
+            """.format(argname=argname, paramname=self.parser_name)
+
 class idtype_t_converter(int_converter):
     type = 'idtype_t'
 
-class id_t_converter(CConverter):
+class id_t_converter(pid_t_converter):
     type = 'id_t'
-    format_unit = '" _Py_PARSE_PID "'
 
 class intptr_t_converter(CConverter):
     type = 'intptr_t'
@@ -2808,8 +2815,7 @@ class Py_off_t_return_converter(long_return_converter):
     type = 'Py_off_t'
     conversion_fn = 'PyLong_FromPy_off_t'
 
-class path_confname_converter(CConverter):
-    type="int"
+class path_confname_converter(int_converter):
     converter="conv_path_confname"
 
 class confstr_confname_converter(path_confname_converter):
