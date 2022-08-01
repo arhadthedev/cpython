@@ -9,15 +9,12 @@ import sys
 import threading
 import unittest
 from unittest import mock
-from test.support import socket_helper
-try:
-    import ssl
-except ImportError:
-    ssl = None
+from test.support import import_helper, socket_helper
 
 import asyncio
 from test.test_asyncio import utils as test_utils
 
+ssl = import_helper.import_module('ssl')
 
 def tearDownModule():
     asyncio.set_event_loop_policy(None)
@@ -566,209 +563,6 @@ class StreamTests(test_utils.TestCase):
         test_utils.run_briefly(self.loop)
         self.assertIs(stream._waiter, None)
 
-    def test_start_server(self):
-
-        class MyServer:
-
-            def __init__(self, loop):
-                self.server = None
-                self.loop = loop
-
-            async def handle_client(self, client_reader, client_writer):
-                data = await client_reader.readline()
-                client_writer.write(data)
-                await client_writer.drain()
-                client_writer.close()
-                await client_writer.wait_closed()
-
-            def start(self):
-                sock = socket.create_server(('127.0.0.1', 0))
-                self.server = self.loop.run_until_complete(
-                    asyncio.start_server(self.handle_client,
-                                         sock=sock))
-                return sock.getsockname()
-
-            def handle_client_callback(self, client_reader, client_writer):
-                self.loop.create_task(self.handle_client(client_reader,
-                                                         client_writer))
-
-            def start_callback(self):
-                sock = socket.create_server(('127.0.0.1', 0))
-                addr = sock.getsockname()
-                sock.close()
-                self.server = self.loop.run_until_complete(
-                    asyncio.start_server(self.handle_client_callback,
-                                         host=addr[0], port=addr[1]))
-                return addr
-
-            def stop(self):
-                if self.server is not None:
-                    self.server.close()
-                    self.loop.run_until_complete(self.server.wait_closed())
-                    self.server = None
-
-        async def client(addr):
-            reader, writer = await asyncio.open_connection(*addr)
-            # send a line
-            writer.write(b"hello world!\n")
-            # read it back
-            msgback = await reader.readline()
-            writer.close()
-            await writer.wait_closed()
-            return msgback
-
-        messages = []
-        self.loop.set_exception_handler(lambda loop, ctx: messages.append(ctx))
-
-        # test the server variant with a coroutine as client handler
-        server = MyServer(self.loop)
-        addr = server.start()
-        msg = self.loop.run_until_complete(self.loop.create_task(client(addr)))
-        server.stop()
-        self.assertEqual(msg, b"hello world!\n")
-
-        # test the server variant with a callback as client handler
-        server = MyServer(self.loop)
-        addr = server.start_callback()
-        msg = self.loop.run_until_complete(self.loop.create_task(client(addr)))
-        server.stop()
-        self.assertEqual(msg, b"hello world!\n")
-
-        self.assertEqual(messages, [])
-
-    @socket_helper.skip_unless_bind_unix_socket
-    def test_start_unix_server(self):
-
-        class MyServer:
-
-            def __init__(self, loop, path):
-                self.server = None
-                self.loop = loop
-                self.path = path
-
-            async def handle_client(self, client_reader, client_writer):
-                data = await client_reader.readline()
-                client_writer.write(data)
-                await client_writer.drain()
-                client_writer.close()
-                await client_writer.wait_closed()
-
-            def start(self):
-                self.server = self.loop.run_until_complete(
-                    asyncio.start_unix_server(self.handle_client,
-                                              path=self.path))
-
-            def handle_client_callback(self, client_reader, client_writer):
-                self.loop.create_task(self.handle_client(client_reader,
-                                                         client_writer))
-
-            def start_callback(self):
-                start = asyncio.start_unix_server(self.handle_client_callback,
-                                                  path=self.path)
-                self.server = self.loop.run_until_complete(start)
-
-            def stop(self):
-                if self.server is not None:
-                    self.server.close()
-                    self.loop.run_until_complete(self.server.wait_closed())
-                    self.server = None
-
-        async def client(path):
-            reader, writer = await asyncio.open_unix_connection(path)
-            # send a line
-            writer.write(b"hello world!\n")
-            # read it back
-            msgback = await reader.readline()
-            writer.close()
-            await writer.wait_closed()
-            return msgback
-
-        messages = []
-        self.loop.set_exception_handler(lambda loop, ctx: messages.append(ctx))
-
-        # test the server variant with a coroutine as client handler
-        with test_utils.unix_socket_path() as path:
-            server = MyServer(self.loop, path)
-            server.start()
-            msg = self.loop.run_until_complete(
-                self.loop.create_task(client(path)))
-            server.stop()
-            self.assertEqual(msg, b"hello world!\n")
-
-        # test the server variant with a callback as client handler
-        with test_utils.unix_socket_path() as path:
-            server = MyServer(self.loop, path)
-            server.start_callback()
-            msg = self.loop.run_until_complete(
-                self.loop.create_task(client(path)))
-            server.stop()
-            self.assertEqual(msg, b"hello world!\n")
-
-        self.assertEqual(messages, [])
-
-    @unittest.skipIf(ssl is None, 'No ssl module')
-    def test_start_tls(self):
-
-        class MyServer:
-
-            def __init__(self, loop):
-                self.server = None
-                self.loop = loop
-
-            async def handle_client(self, client_reader, client_writer):
-                data1 = await client_reader.readline()
-                client_writer.write(data1)
-                await client_writer.drain()
-                assert client_writer.get_extra_info('sslcontext') is None
-                await client_writer.start_tls(
-                    test_utils.simple_server_sslcontext())
-                assert client_writer.get_extra_info('sslcontext') is not None
-                data2 = await client_reader.readline()
-                client_writer.write(data2)
-                await client_writer.drain()
-                client_writer.close()
-                await client_writer.wait_closed()
-
-            def start(self):
-                sock = socket.create_server(('127.0.0.1', 0))
-                self.server = self.loop.run_until_complete(
-                    asyncio.start_server(self.handle_client,
-                                         sock=sock))
-                return sock.getsockname()
-
-            def stop(self):
-                if self.server is not None:
-                    self.server.close()
-                    self.loop.run_until_complete(self.server.wait_closed())
-                    self.server = None
-
-        async def client(addr):
-            reader, writer = await asyncio.open_connection(*addr)
-            writer.write(b"hello world 1!\n")
-            await writer.drain()
-            msgback1 = await reader.readline()
-            assert writer.get_extra_info('sslcontext') is None
-            await writer.start_tls(test_utils.simple_client_sslcontext())
-            assert writer.get_extra_info('sslcontext') is not None
-            writer.write(b"hello world 2!\n")
-            await writer.drain()
-            msgback2 = await reader.readline()
-            writer.close()
-            await writer.wait_closed()
-            return msgback1, msgback2
-
-        messages = []
-        self.loop.set_exception_handler(lambda loop, ctx: messages.append(ctx))
-
-        server = MyServer(self.loop)
-        addr = server.start()
-        msg1, msg2 = self.loop.run_until_complete(client(addr))
-        server.stop()
-
-        self.assertEqual(messages, [])
-        self.assertEqual(msg1, b"hello world 1!\n")
-        self.assertEqual(msg2, b"hello world 2!\n")
-
     @unittest.skipIf(sys.platform == 'win32', "Don't have pipes")
     def test_read_all_from_pipe_reader(self):
         # See asyncio issue 168.  This test is derived from the example
@@ -907,48 +701,6 @@ os.close(fd)
         thread.join()
         self.assertEqual([], messages)
 
-    def test___repr__(self):
-        stream = asyncio.StreamReader(loop=self.loop)
-        self.assertEqual("<StreamReader>", repr(stream))
-
-    def test___repr__nondefault_limit(self):
-        stream = asyncio.StreamReader(loop=self.loop, limit=123)
-        self.assertEqual("<StreamReader limit=123>", repr(stream))
-
-    def test___repr__eof(self):
-        stream = asyncio.StreamReader(loop=self.loop)
-        stream.feed_eof()
-        self.assertEqual("<StreamReader eof>", repr(stream))
-
-    def test___repr__data(self):
-        stream = asyncio.StreamReader(loop=self.loop)
-        stream.feed_data(b'data')
-        self.assertEqual("<StreamReader 4 bytes>", repr(stream))
-
-    def test___repr__exception(self):
-        stream = asyncio.StreamReader(loop=self.loop)
-        exc = RuntimeError()
-        stream.set_exception(exc)
-        self.assertEqual("<StreamReader exception=RuntimeError()>",
-                         repr(stream))
-
-    def test___repr__waiter(self):
-        stream = asyncio.StreamReader(loop=self.loop)
-        stream._waiter = asyncio.Future(loop=self.loop)
-        self.assertRegex(
-            repr(stream),
-            r"<StreamReader waiter=<Future pending[\S ]*>>")
-        stream._waiter.set_result(None)
-        self.loop.run_until_complete(stream._waiter)
-        stream._waiter = None
-        self.assertEqual("<StreamReader>", repr(stream))
-
-    def test___repr__transport(self):
-        stream = asyncio.StreamReader(loop=self.loop)
-        stream._transport = mock.Mock()
-        stream._transport.__repr__ = mock.Mock()
-        stream._transport.__repr__.return_value = "<Transport>"
-        self.assertEqual("<StreamReader transport=<Transport>>", repr(stream))
 
     def test_IncompleteReadError_pickleable(self):
         e = asyncio.IncompleteReadError(b'abc', 10)
@@ -1055,7 +807,197 @@ os.close(fd)
             data = self.loop.run_until_complete(f)
             self.assertEqual(data, b'')
 
+class StartTests(unittest.IsolatedAsyncioTestCase):
+
+    async def test_start_server(self):
+
+        async def client(addr):
+            reader, writer = await asyncio.open_connection(*addr)
+            # send a line
+            writer.write(b'hello world!\n')
+            # read it back
+            msgback = await reader.readline()
+            writer.close()
+            await writer.wait_closed()
+            return msgback
+
+        async def handle_client(client_reader, client_writer):
+            data = await client_reader.readline()
+            client_writer.write(data)
+            await client_writer.drain()
+            client_writer.close()
+            await client_writer.wait_closed()
+
+        # test the server variant with a coroutine as client handler
+        server = await asyncio.start_server(
+            handle_client,
+            host=socket_helper.HOSTv4
+        )
+        addr = server.sockets[0].getsockname()
+        msg = await client(addr)
+        server.close()
+        await server.wait_closed()
+        self.assertEqual(msg, b'hello world!\n')
+
+        # test the server variant with a callback as client handler
+        async def handle_client_with_callback(client_reader, client_writer):
+            asyncio.get_running_loop().create_task(
+                handle_client(client_reader, client_writer)
+            )
+
+        server = await asyncio.start_server(
+            handle_client_with_callback,
+            host=socket_helper.HOSTv4
+        )
+        address, port = server.sockets[0].getsockname()
+        msg = await client(addr)
+        server.close()
+        await server.wait_closed()
+        self.assertEqual(msg, b'hello world!\n')
+
+    @socket_helper.skip_unless_bind_unix_socket
+    async def test_start_unix_server(self):
+
+        async def client(path):
+            reader, writer = await asyncio.open_unix_connection(path)
+            # send a line
+            writer.write(b"hello world!\n")
+            # read it back
+            msgback = await reader.readline()
+            writer.close()
+            await writer.wait_closed()
+            return msgback
+
+        async def handle_client(client_reader, client_writer):
+            data = await client_reader.readline()
+            client_writer.write(data)
+            await client_writer.drain()
+            client_writer.close()
+            await client_writer.wait_closed()
+
+        # test the server variant with a coroutine as client handler
+        with test_utils.unix_socket_path() as path:
+            server = await asyncio.start_unix_server(
+                handle_client,
+                path=path
+            )
+            msg = await client(path)
+            server.close()
+            await server.wait_closed()
+            self.assertEqual(msg, b'hello world!\n')
+
+        # test the server variant with a callback as client handler
+        async def handle_client_with_callback(client_reader, client_writer):
+            asyncio.get_running_loop().create_task(
+                handle_client(client_reader, client_writer)
+            )
+
+        with test_utils.unix_socket_path() as path:
+            server = await asyncio.start_unix_server(
+                handle_client,
+                path=path
+            )
+            server.start_callback()
+            msg = await client(path)
+            server.close()
+            await server.wait_closed()
+            self.assertEqual(msg, b'hello world!\n')
+
         self.assertEqual(messages, [])
+
+    @unittest.skipIf(ssl is None, 'No ssl module')
+    async def test_start_tls(self):
+
+        async def client(addr):
+            reader, writer = await asyncio.open_connection(*addr)
+            writer.write(b"hello world 1!\n")
+            await writer.drain()
+            msgback1 = await reader.readline()
+            assert writer.get_extra_info('sslcontext') is None
+            await writer.start_tls(test_utils.simple_client_sslcontext())
+            assert writer.get_extra_info('sslcontext') is not None
+            writer.write(b'hello world 2!\n')
+            await writer.drain()
+            msgback2 = await reader.readline()
+            writer.close()
+            await writer.wait_closed()
+            return msgback1, msgback2
+
+        async def handle_client(client_reader, client_writer):
+            data1 = await client_reader.readline()
+            client_writer.write(data1)
+            await client_writer.drain()
+            assert client_writer.get_extra_info('sslcontext') is None
+            await client_writer.start_tls(
+                test_utils.simple_server_sslcontext())
+            assert client_writer.get_extra_info('sslcontext') is not None
+
+            data2 = await client_reader.readline()
+            client_writer.write(data2)
+            await client_writer.drain()
+            client_writer.close()
+            await client_writer.wait_closed()
+
+        server = await asyncio.start_server(
+            handle_client,
+            host=socket_helper.HOSTv4
+        )
+        addr = server.sockets[0].getsockname()
+
+        msg1, msg2 = await client(addr)
+        server.close()
+        await server.wait_closed()
+        self.assertEqual(msg1, b'hello world 1!\n')
+        self.assertEqual(msg2, b'hello world 2!\n')
+
+
+class ReprTests(unittest.IsolatedAsyncioTestCase):
+
+    async def test___repr__(self):
+        stream = asyncio.StreamReader(loop=asyncio.get_running_loop())
+        self.assertEqual('<StreamReader>', repr(stream))
+
+    async def test___repr__nondefault_limit(self):
+        stream = asyncio.StreamReader(
+            loop=asyncio.get_running_loop(),
+            limit=123
+        )
+        self.assertEqual('<StreamReader limit=123>', repr(stream))
+
+    async def test___repr__eof(self):
+        stream = asyncio.StreamReader(loop=asyncio.get_running_loop())
+        stream.feed_eof()
+        self.assertEqual('<StreamReader eof>', repr(stream))
+
+    async def test___repr__data(self):
+        stream = asyncio.StreamReader(loop=asyncio.get_running_loop())
+        stream.feed_data(b'data')
+        self.assertEqual('<StreamReader 4 bytes>', repr(stream))
+
+    async def test___repr__exception(self):
+        stream = asyncio.StreamReader(loop=asyncio.get_running_loop())
+        exc = RuntimeError()
+        stream.set_exception(exc)
+        self.assertEqual('<StreamReader exception=RuntimeError()>',
+                         repr(stream))
+
+    async def test___repr__waiter(self):
+        stream = asyncio.StreamReader(loop=asyncio.get_running_loop())
+        stream._waiter = asyncio.Future(loop=asyncio.get_running_loop())
+        self.assertRegex(
+            repr(stream),
+            r'<StreamReader waiter=<Future pending[\S ]*>>')
+        stream._waiter.set_result(None)
+        await stream._waiter
+        stream._waiter = None
+        self.assertEqual('<StreamReader>', repr(stream))
+
+    async def test___repr__transport(self):
+        stream = asyncio.StreamReader(loop=asyncio.get_running_loop())
+        stream._transport = mock.Mock()
+        stream._transport.__repr__ = mock.Mock()
+        stream._transport.__repr__.return_value = '<Transport>'
+        self.assertEqual('<StreamReader transport=<Transport>>', repr(stream))
 
 
 if __name__ == '__main__':
