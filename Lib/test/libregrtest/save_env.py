@@ -320,8 +320,12 @@ class saved_test_environment:
                 support.environment_altered = True
                 restore(original)
                 if not self.quiet and not self.pgo:
+                    leaked = current - original
+                    printable_list = ", ".join(str(item) for item in leaked)
                     print_warning(
                         f"{name} was modified by {self.testname}\n"
                         f"  Before: {original}\n"
-                        f"  After:  {current} ")
+                        f"  After:  {current} \n"
+                        f'{self.testname} leaked {name} items: {printable_list}'
+                    )
         return False

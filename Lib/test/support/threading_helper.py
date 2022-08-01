@@ -33,6 +33,8 @@ def threading_cleanup(*original_values):
         if values == original_values:
             break
 
+        leaked = values[1] - original_values[1]
+
         if not count:
             # Display a warning at the first iteration
             support.environment_altered = True
@@ -40,8 +42,14 @@ def threading_cleanup(*original_values):
             dangling_count = values[0] - original_values[0]
             ending = 's' if dangling_count > 1 else ''
             message = f'{dangling_count} thread{ending} leaked'
+            #                                                 Выводим разницу между множетвами, как unittest
+            #                                                 Что-то продолжает выводит warinig-и:
+            #                                                 FAILED (failures=1, skipped=3)
+            #Warning -- threading._dangling was modified by test_support
+            #Warning --   Before: {<weakref at 0x000002B68608CE50; to '_MainThread' at 0x000002B685FA5790>}
+            #Warning --   After:  {<weakref at 0x000002B688145670; to 'Thread' at 0x000002B68817FA10>, <weakref at 0x000002B6860B83B0; to '_MainThread' at 0x000002B685FA5790>, <weakref at 0x000002B688146660; to 'Thread' at 0x000002B68817E290>}
             leak_info = AssertionError(message)
-            thread_list = ', '.join(repr(thread) for thread in dangling_threads)
+            thread_list = ', '.join(f'{thread.native_id} ({thread.name})' for thread in leaked)
             leak_info.add_note(f'Dangling threads: {thread_list}')
             raise leak_info
         values = None
