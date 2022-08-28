@@ -12233,38 +12233,38 @@ unicode_rfind_impl(PyObject *self, const char *substring, Py_ssize_t start,
     return result;
 }
 
-PyDoc_STRVAR(rindex__doc__,
-             "S.rindex(sub[, start[, end]]) -> int\n\
-\n\
-Return the highest index in S where substring sub is found,\n\
-such that sub is contained within S[start:end].  Optional\n\
-arguments start and end are interpreted as in slice notation.\n\
-\n\
-Raises ValueError when the substring is not found.");
+/*[clinic input]
+str.rindex as unicode_rindex -> Py_ssize_t
 
-static PyObject *
-unicode_rindex(PyObject *self, PyObject *args)
+    substring: str
+    start: Py_ssize_t = 0
+    end: Py_ssize_t(c_default="PY_SSIZE_T_MAX") = sys.maxsize
+    /
+
+Return the highest index in a string where substring is found.
+
+The substring is contained within self[start:end].  Optional
+arguments start and end are interpreted as in slice notation.
+
+Raises ValueError when the substring is not found.
+[clinic start generated code]*/
+
+static Py_ssize_t
+unicode_rindex_impl(PyObject *self, const char *substring, Py_ssize_t start,
+                    Py_ssize_t end)
+/*[clinic end generated code: output=cef23fecbb674411 input=4ad1e6557c7fda44]*/
 {
-    /* initialize variables to prevent gcc warning */
-    PyObject *substring = NULL;
-    Py_ssize_t start = 0;
-    Py_ssize_t end = 0;
-    Py_ssize_t result;
-
-    if (!parse_args_finds_unicode("rindex", args, &substring, &start, &end))
-        return NULL;
-
-    result = any_find_slice(self, substring, start, end, -1);
+    Py_ssize_t result = any_find_slice(self, substring, start, end, -1);
 
     if (result == -2)
-        return NULL;
+        return -1;
 
     if (result < 0) {
         PyErr_SetString(PyExc_ValueError, "substring not found");
-        return NULL;
+        return -1;
     }
 
-    return PyLong_FromSsize_t(result);
+    return result;
 }
 
 /*[clinic input]
@@ -13306,7 +13306,7 @@ static PyMethodDef unicode_methods[] = {
     UNICODE_LOWER_METHODDEF
     UNICODE_LSTRIP_METHODDEF
     UNICODE_RFIND_METHODDEF
-    {"rindex", (PyCFunction) unicode_rindex, METH_VARARGS, rindex__doc__},
+    UNICODE_RINDEX_METHODDEF
     UNICODE_RJUST_METHODDEF
     UNICODE_RSTRIP_METHODDEF
     UNICODE_RPARTITION_METHODDEF
