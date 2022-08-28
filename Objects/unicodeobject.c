@@ -10826,24 +10826,6 @@ PyUnicode_AppendAndDel(PyObject **pleft, PyObject *right)
     Py_XDECREF(right);
 }
 
-/*
-Wraps asciilib_parse_args_finds() and additionally ensures that the
-first argument is a unicode object.
-*/
-
-static inline int
-parse_args_finds_unicode(const char * function_name, PyObject *args,
-                         PyObject **substring,
-                         Py_ssize_t *start, Py_ssize_t *end)
-{
-    if (asciilib_parse_args_finds(function_name, args, substring, start, end)) {
-        if (ensure_unicode(*substring) < 0)
-            return 0;
-        return 1;
-    }
-    return 0;
-}
-
 /*[clinic input]
 str.count as unicode_count -> Py_ssize_t
 
