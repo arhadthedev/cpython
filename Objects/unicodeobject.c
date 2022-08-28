@@ -12761,26 +12761,28 @@ unicode_zfill_impl(PyObject *self, Py_ssize_t width)
     return u;
 }
 
-PyDoc_STRVAR(startswith__doc__,
-             "S.startswith(prefix[, start[, end]]) -> bool\n\
-\n\
-Return True if S starts with the specified prefix, False otherwise.\n\
-With optional start, test S beginning at that position.\n\
-With optional end, stop comparing S at that position.\n\
-prefix can also be a tuple of strings to try.");
+/*[clinic input]
+str.startswith as unicode_startswith -> bool
 
-static PyObject *
-unicode_startswith(PyObject *self,
-                   PyObject *args)
+    prefix as subobj: object
+    start: Py_ssize_t = 0
+    end: Py_ssize_t(c_default="PY_SSIZE_T_MAX") = sys.maxsize
+    /
+
+Return True if a string starts with the specified prefix, False otherwise.
+
+Prefix can also be a tuple of strings to try.
+
+Optional arguments start and end are interpreted as in slice notation.
+[clinic start generated code]*/
+
+static int
+unicode_startswith_impl(PyObject *self, PyObject *subobj, Py_ssize_t start,
+                        Py_ssize_t end)
+/*[clinic end generated code: output=f1423b7e1aa6c802 input=f79e857c1f5ba5ed]*/
 {
-    PyObject *subobj;
     PyObject *substring;
-    Py_ssize_t start = 0;
-    Py_ssize_t end = PY_SSIZE_T_MAX;
-    int result;
 
-    if (!asciilib_parse_args_finds("startswith", args, &subobj, &start, &end))
-        return NULL;
     if (PyTuple_Check(subobj)) {
         Py_ssize_t i;
         for (i = 0; i < PyTuple_GET_SIZE(subobj); i++) {
@@ -12790,28 +12792,20 @@ unicode_startswith(PyObject *self,
                              "tuple for startswith must only contain str, "
                              "not %.100s",
                              Py_TYPE(substring)->tp_name);
-                return NULL;
+                return -1;
             }
-            result = tailmatch(self, substring, start, end, -1);
-            if (result == -1)
-                return NULL;
-            if (result) {
-                Py_RETURN_TRUE;
-            }
+            return tailmatch(self, substring, start, end, -1);
         }
         /* nothing matched */
-        Py_RETURN_FALSE;
+        return 0;
     }
     if (!PyUnicode_Check(subobj)) {
         PyErr_Format(PyExc_TypeError,
                      "startswith first arg must be str or "
                      "a tuple of str, not %.100s", Py_TYPE(subobj)->tp_name);
-        return NULL;
+        return -1;
     }
-    result = tailmatch(self, subobj, start, end, -1);
-    if (result == -1)
-        return NULL;
-    return PyBool_FromLong(result);
+    return tailmatch(self, subobj, start, end, -1);
 }
 
 
@@ -13315,7 +13309,7 @@ static PyMethodDef unicode_methods[] = {
     UNICODE_SWAPCASE_METHODDEF
     UNICODE_TRANSLATE_METHODDEF
     UNICODE_UPPER_METHODDEF
-    {"startswith", (PyCFunction) unicode_startswith, METH_VARARGS, startswith__doc__},
+    UNICODE_STARTSWITH_METHODDEF
     {"endswith", (PyCFunction) unicode_endswith, METH_VARARGS, endswith__doc__},
     UNICODE_REMOVEPREFIX_METHODDEF
     UNICODE_REMOVESUFFIX_METHODDEF

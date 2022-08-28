@@ -1775,6 +1775,77 @@ exit:
     return return_value;
 }
 
+PyDoc_STRVAR(unicode_startswith__doc__,
+"startswith($self, prefix, start=0, end=sys.maxsize, /)\n"
+"--\n"
+"\n"
+"Return True if a string starts with the specified prefix, False otherwise.\n"
+"\n"
+"Prefix can also be a tuple of strings to try.\n"
+"\n"
+"Optional arguments start and end are interpreted as in slice notation.");
+
+#define UNICODE_STARTSWITH_METHODDEF    \
+    {"startswith", _PyCFunction_CAST(unicode_startswith), METH_FASTCALL, unicode_startswith__doc__},
+
+static int
+unicode_startswith_impl(PyObject *self, PyObject *subobj, Py_ssize_t start,
+                        Py_ssize_t end);
+
+static PyObject *
+unicode_startswith(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
+{
+    PyObject *return_value = NULL;
+    PyObject *subobj;
+    Py_ssize_t start = 0;
+    Py_ssize_t end = PY_SSIZE_T_MAX;
+    int _return_value;
+
+    if (!_PyArg_CheckPositional("startswith", nargs, 1, 3)) {
+        goto exit;
+    }
+    subobj = args[0];
+    if (nargs < 2) {
+        goto skip_optional;
+    }
+    {
+        Py_ssize_t ival = -1;
+        PyObject *iobj = _PyNumber_Index(args[1]);
+        if (iobj != NULL) {
+            ival = PyLong_AsSsize_t(iobj);
+            Py_DECREF(iobj);
+        }
+        if (ival == -1 && PyErr_Occurred()) {
+            goto exit;
+        }
+        start = ival;
+    }
+    if (nargs < 3) {
+        goto skip_optional;
+    }
+    {
+        Py_ssize_t ival = -1;
+        PyObject *iobj = _PyNumber_Index(args[2]);
+        if (iobj != NULL) {
+            ival = PyLong_AsSsize_t(iobj);
+            Py_DECREF(iobj);
+        }
+        if (ival == -1 && PyErr_Occurred()) {
+            goto exit;
+        }
+        end = ival;
+    }
+skip_optional:
+    _return_value = unicode_startswith_impl(self, subobj, start, end);
+    if ((_return_value == -1) && PyErr_Occurred()) {
+        goto exit;
+    }
+    return_value = PyBool_FromLong((long)_return_value);
+
+exit:
+    return return_value;
+}
+
 PyDoc_STRVAR(unicode___format____doc__,
 "__format__($self, format_spec, /)\n"
 "--\n"
@@ -1916,4 +1987,4 @@ skip_optional_pos:
 exit:
     return return_value;
 }
-/*[clinic end generated code: output=c3f4bd3464035d05 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=042ba13327cef4d1 input=a9049054013a1b77]*/
