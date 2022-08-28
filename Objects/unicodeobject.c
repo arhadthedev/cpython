@@ -11023,33 +11023,33 @@ unicode_expandtabs_impl(PyObject *self, int tabsize)
     return NULL;
 }
 
-PyDoc_STRVAR(find__doc__,
-             "S.find(sub[, start[, end]]) -> int\n\
-\n\
-Return the lowest index in S where substring sub is found,\n\
-such that sub is contained within S[start:end].  Optional\n\
-arguments start and end are interpreted as in slice notation.\n\
-\n\
-Return -1 on failure.");
+/*[clinic input]
+str.find as unicode_find -> Py_ssize_t
 
-static PyObject *
-unicode_find(PyObject *self, PyObject *args)
+    substring: str
+    start: Py_ssize_t = 0
+    end: Py_ssize_t(c_default="PY_SSIZE_T_MAX") = sys.maxsize
+    /
+
+Return the lowest index in a string where substring is found.
+
+The substring is contained within self[start:end].  Optional
+arguments start and end are interpreted as in slice notation.
+
+Return -1 on failure.
+[clinic start generated code]*/
+
+static Py_ssize_t
+unicode_find_impl(PyObject *self, const char *substring, Py_ssize_t start,
+                  Py_ssize_t end)
+/*[clinic end generated code: output=f98793b80b285429 input=7eade56a0003e91b]*/
 {
-    /* initialize variables to prevent gcc warning */
-    PyObject *substring = NULL;
-    Py_ssize_t start = 0;
-    Py_ssize_t end = 0;
-    Py_ssize_t result;
-
-    if (!parse_args_finds_unicode("find", args, &substring, &start, &end))
-        return NULL;
-
-    result = any_find_slice(self, substring, start, end, 1);
+    Py_ssize_t result = any_find_slice(self, substring, start, end, 1);
 
     if (result == -2)
-        return NULL;
+        return -1;
 
-    return PyLong_FromSsize_t(result);
+    return result;
 }
 
 static PyObject *
@@ -13299,7 +13299,7 @@ static PyMethodDef unicode_methods[] = {
     UNICODE_CENTER_METHODDEF
     {"count", (PyCFunction) unicode_count, METH_VARARGS, count__doc__},
     UNICODE_EXPANDTABS_METHODDEF
-    {"find", (PyCFunction) unicode_find, METH_VARARGS, find__doc__},
+    UNICODE_FIND_METHODDEF
     UNICODE_PARTITION_METHODDEF
     {"index", (PyCFunction) unicode_index, METH_VARARGS, index__doc__},
     UNICODE_LJUST_METHODDEF
