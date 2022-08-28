@@ -12203,33 +12203,34 @@ unicode_repr(PyObject *unicode)
     return repr;
 }
 
-PyDoc_STRVAR(rfind__doc__,
-             "S.rfind(sub[, start[, end]]) -> int\n\
-\n\
-Return the highest index in S where substring sub is found,\n\
-such that sub is contained within S[start:end].  Optional\n\
-arguments start and end are interpreted as in slice notation.\n\
-\n\
-Return -1 on failure.");
+/*[clinic input]
+str.rfind as unicode_rfind -> Py_ssize_t
 
-static PyObject *
-unicode_rfind(PyObject *self, PyObject *args)
+    substring: str
+    start: Py_ssize_t = 0
+    end: Py_ssize_t(c_default="PY_SSIZE_T_MAX") = sys.maxsize
+    /
+
+Return the highest index in a string where substring is found.
+
+
+The substring is contained within self[start:end].  Optional
+arguments start and end are interpreted as in slice notation.
+
+Return -1 on failure.
+[clinic start generated code]*/
+
+static Py_ssize_t
+unicode_rfind_impl(PyObject *self, const char *substring, Py_ssize_t start,
+                   Py_ssize_t end)
+/*[clinic end generated code: output=6c62db5aa55b819d input=2bcacfb0f6a7f9d3]*/
 {
-    /* initialize variables to prevent gcc warning */
-    PyObject *substring = NULL;
-    Py_ssize_t start = 0;
-    Py_ssize_t end = 0;
-    Py_ssize_t result;
-
-    if (!parse_args_finds_unicode("rfind", args, &substring, &start, &end))
-        return NULL;
-
-    result = any_find_slice(self, substring, start, end, -1);
+    Py_ssize_t result = any_find_slice(self, substring, start, end, -1);
 
     if (result == -2)
-        return NULL;
+        return -1;
 
-    return PyLong_FromSsize_t(result);
+    return result;
 }
 
 PyDoc_STRVAR(rindex__doc__,
@@ -13304,7 +13305,7 @@ static PyMethodDef unicode_methods[] = {
     UNICODE_LJUST_METHODDEF
     UNICODE_LOWER_METHODDEF
     UNICODE_LSTRIP_METHODDEF
-    {"rfind", (PyCFunction) unicode_rfind, METH_VARARGS, rfind__doc__},
+    UNICODE_RFIND_METHODDEF
     {"rindex", (PyCFunction) unicode_rindex, METH_VARARGS, rindex__doc__},
     UNICODE_RJUST_METHODDEF
     UNICODE_RSTRIP_METHODDEF
