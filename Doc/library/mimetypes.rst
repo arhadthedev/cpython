@@ -279,7 +279,16 @@ than one MIME-type database; it provides an interface similar to the one of the
 Command-Line Usage
 ------------------
 
-The :mod:`mimetypes` module can be executed as a script from the command line.
+.. versionadded:: 3.12
+
+The :mod:`mimetypes` command-line interface sets the exit code to ``1`` when
+unknown MIME type or file extension is found. For the old behavior.
+
+ abruption on
+unknown MIME types and file extensions 
+
+
+exit code was changed ``1``.
 
 .. code-block:: sh
 
