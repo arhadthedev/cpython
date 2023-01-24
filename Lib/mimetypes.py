@@ -609,6 +609,11 @@ def _main():
         action='store_true',
         help='additionally search for common but non-standard types'
     )
+    parser.add_argument(
+        '-n', '--nofail',
+        action='store_true',
+        help='do not abort when an unknown type is met'
+    )
     parser.add_argument('type', nargs='+', help='a type to search')
     arguments = parser.parse_args()
 
@@ -617,14 +622,14 @@ def _main():
             guess = guess_extension(gtype, not arguments.lenient)
             if guess:
                 print(guess)
-            else:
+            elif not arguments.nofail:
                 sys.exit(f"error: unknown type {gtype}")
     else:
         for gtype in arguments.type:
             guess, encoding = guess_type(gtype, not arguments.lenient)
             if guess:
                 print('type:', guess, 'encoding:', encoding)
-            else:
+            elif not arguments.nofail:
                 sys.exit(f"error: unknown extension of {gtype}")
 
 
