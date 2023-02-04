@@ -1,0 +1,2 @@
+Add ``ipv4_mapped`` property to :class:`ipaddress.IPv4Address` to handle
+``::FFFF:x.y.z.w`` adresses. Patch by Alex Perry.
