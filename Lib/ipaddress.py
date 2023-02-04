@@ -422,14 +422,6 @@ class _IPAddressBase:
             msg = "%d (>= 2**%d) is not permitted as an IPv%d address"
             raise AddressValueError(msg % (address, self._max_prefixlen,
                                            self._version))
-
-    @property
-    def ipv4_mapped(self):
-        """Returns an IPv4 address, maybe mapped by RFC 5156 from ::ffff:
-
-        Returns:
-            An IPv4Address instance or None
-        """
         return None
 
     def _check_packed_address(self, address, expected_len):
@@ -1892,6 +1884,19 @@ class _BaseV6:
     def version(self):
         return self._version
 
+    @property
+    def ipv4_mapped(self):
+        """Return the IPv4 mapped address.
+
+        Returns:
+            If the IPv6 address is a v4 mapped address, return the
+            IPv4 mapped address. Return None otherwise.
+
+        """
+        if (self._ip >> 32) != 0xFFFF:
+            return None
+        return IPv4Address(self._ip & 0xFFFFFFFF)
+
 
 class IPv6Address(_BaseV6, _BaseAddress):
 
@@ -1965,19 +1970,6 @@ class IPv6Address(_BaseV6, _BaseAddress):
 
         """
         return self._scope_id
-
-    @property
-    def ipv4_mapped(self):
-        """Return the IPv4 mapped address.
-
-        Returns:
-            If the IPv6 address is a v4 mapped address, return the
-            IPv4 mapped address. Return None otherwise.
-
-        """
-        if (self._ip >> 32) != 0xFFFF:
-            return None
-        return IPv4Address(self._ip & 0xFFFFFFFF)
 
     @property
     def packed(self):
