@@ -1,0 +1,24 @@
+name: Bots
+
+on:
+  # PR synchronization is a push into a branch associated with the PR
+  pull_request:
+    types: [opened, edited, synchronize, labeled, unlabeled]
+  issue_comment:
+    types: [created, edited]
+  pull_request_review_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  call_bedevere:
+    name: Call the missing information checker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: arhadthedev/bedevere@8fcc0fdb9baac9594faa4e2efae6770c4b6089d0
+        with:
+          token: ${{ secrets.BEDEVERE_PAT }}
+          event: ${{ toJSON(github.event) }}
