@@ -91,6 +91,8 @@ typedef struct {
     /* Memory allocated for rl_completer_word_break_characters
        (see issue #17289 for the motivation). */
     char *completer_word_break_characters;
+
+    int history_length;
 } readlinestate;
 
 static inline readlinestate*
@@ -274,8 +276,6 @@ readline_read_history_file_impl(PyObject *module, PyObject *filename_obj)
     Py_RETURN_NONE;
 }
 
-static int _history_length = -1; /* do not truncate history by default */
-
 /* Exported function to save a readline history file */
 
 /*[clinic input]
@@ -305,8 +305,9 @@ readline_write_history_file_impl(PyObject *module, PyObject *filename_obj)
         filename = NULL;
     }
     errno = err = write_history(filename);
-    if (!err && _history_length >= 0)
-        history_truncate_file(filename, _history_length);
+    readlinestate *state = get_readline_state(module);
+    if (!err && state->history_length >= 0)
+        history_truncate_file(filename, state->history_length);
     Py_XDECREF(filename_bytes);
     errno = err;
     if (errno)
@@ -348,8 +349,8 @@ readline_append_history_file_impl(PyObject *module, int nelements,
     readlinestate *state = get_readline_state(module);
     errno = err = append_history(
         nelements - state->libedit_append_replace_history_offset, filename);
-    if (!err && _history_length >= 0)
-        history_truncate_file(filename, _history_length);
+    if (!err && state->history_length >= 0)
+        history_truncate_file(filename, state->history_length);
     Py_XDECREF(filename_bytes);
     errno = err;
     if (errno)
@@ -376,7 +377,8 @@ static PyObject *
 readline_set_history_length_impl(PyObject *module, int length)
 /*[clinic end generated code: output=e161a53e45987dc7 input=b8901bf16488b760]*/
 {
-    _history_length = length;
+    readlinestate *state = get_readline_state(module);
+    state->history_length = length;
     Py_RETURN_NONE;
 }
 
@@ -392,7 +394,8 @@ static PyObject *
 readline_get_history_length_impl(PyObject *module)
 /*[clinic end generated code: output=83a2eeae35b6d2b9 input=5dce2eeba4327817]*/
 {
-    return PyLong_FromLong(_history_length);
+    readlinestate *state = get_readline_state(module);
+    return PyLong_FromLong(state->history_length);
 }
 
 /* Generic hook function setter */
@@ -1461,6 +1464,7 @@ static int
 readline_exec(PyObject *module)
 {
     readlinestate *state = get_readline_state(module);
+    state->history_length = -1; /* do not truncate history by default */
 
     if (strncmp(rl_library_version, libedit_version_tag, strlen(libedit_version_tag)) == 0) {
         state->using_libedit_emulation = 1;
