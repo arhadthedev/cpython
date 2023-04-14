@@ -1450,15 +1450,14 @@ PyDoc_STRVAR(doc_module_le,
 "Importing this module enables command line editing using libedit readline.");
 
 static struct PyModuleDef readlinemodule = {
-    PyModuleDef_HEAD_INIT,
-    "readline",
-    doc_module,
-    sizeof(readlinestate),
-    readline_methods,
-    NULL,
-    readline_traverse,
-    readline_clear,
-    readline_free
+    .m_base = PyModuleDef_HEAD_INIT,
+    .m_name = "readline",
+    .m_doc = doc_module,
+    .m_size = sizeof(readlinestate),
+    .m_methods = readline_methods,
+    .m_traverse = readline_traverse,
+    .m_clear = readline_clear,
+    .m_free = readline_free,
 };
 
 
