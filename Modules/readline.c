@@ -59,10 +59,6 @@ on_completion_display_matches_hook(char **matches,
                                    int num_matches, int max_length);
 #endif
 
-/* Memory allocated for rl_completer_word_break_characters
-   (see issue #17289 for the motivation). */
-static char *completer_word_break_characters;
-
 typedef struct {
   /* Specify hook functions in Python */
   PyObject *completion_display_matches_hook;
@@ -91,6 +87,10 @@ typedef struct {
     int using_libedit_emulation;
     int8_t libedit_history_start;
     int8_t libedit_append_replace_history_offset;
+
+    /* Memory allocated for rl_completer_word_break_characters
+       (see issue #17289 for the motivation). */
+    char *completer_word_break_characters;
 } readlinestate;
 
 static inline readlinestate*
@@ -569,8 +569,9 @@ readline_set_completer_delims(PyObject *module, PyObject *string)
     break_chars = strdup(PyBytes_AS_STRING(encoded));
     Py_DECREF(encoded);
     if (break_chars) {
-        free(completer_word_break_characters);
-        completer_word_break_characters = break_chars;
+        readlinestate *state = get_readline_state(module);
+        free(state->completer_word_break_characters);
+        state->completer_word_break_characters = break_chars;
         rl_completer_word_break_characters = break_chars;
         Py_RETURN_NONE;
     }
@@ -1259,10 +1260,10 @@ setup_readline(readlinestate *mod_state)
     /* Set our completion function */
     rl_attempted_completion_function = flex_complete;
     /* Set Python word break characters */
-    completer_word_break_characters =
+    mod_state->completer_word_break_characters =
         strdup(" \t\n`~!@#$%^&*()-=+[{]}\\|;:'\",<>/?");
         /* All nonalphanums except '.' */
-    rl_completer_word_break_characters = completer_word_break_characters;
+    rl_completer_word_break_characters = mod_state->completer_word_break_characters;
 
     mod_state->begidx = PyLong_FromLong(0L);
     mod_state->endidx = PyLong_FromLong(0L);
