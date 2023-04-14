@@ -51,22 +51,6 @@ extern char **completion_matches(char *, CPFunction *);
 #endif
 #endif
 
-/*
- * It is possible to link the readline module to the readline
- * emulation library of editline/libedit.
- *
- * This emulation library is not 100% API compatible with the "real" readline
- * and cannot be detected at compile-time,
- * hence we use a runtime check to detect if the Python readline module is
- * linked to libedit.
- *
- * Currently there is one known API incompatibility:
- * - 'get_history' has a 1-based index with GNU readline, and a 0-based
- *   index with older versions of libedit's emulation.
- * - Note that replace_history and remove_history use a 0-based index
- *   with both implementations.
- */
-static int using_libedit_emulation = 0;
 static const char libedit_version_tag[] = "EditLine wrapper";
 
 static int8_t libedit_history_start = 0;
@@ -91,6 +75,23 @@ typedef struct {
   PyObject *completer; /* Specify a word completer in Python */
   PyObject *begidx;
   PyObject *endidx;
+
+    /*
+     * It is possible to link the readline module to the readline
+     * emulation library of editline/libedit.
+     *
+     * This emulation library is not 100% API compatible with the "real"
+     * readline and cannot be detected at compile-time,
+     * hence we use a runtime check to detect if the Python readline module is
+     * linked to libedit.
+     *
+     * Currently there is one known API incompatibility:
+     * - 'get_history' has a 1-based index with GNU readline, and a 0-based
+     *   index with older versions of libedit's emulation.
+     * - Note that replace_history and remove_history use a 0-based index
+     *   with both implementations.
+     */
+    int using_libedit_emulation;
 } readlinestate;
 
 static inline readlinestate*
@@ -1452,13 +1453,13 @@ PyDoc_STRVAR(doc_module_le,
 static int
 readline_exec(PyObject *module)
 {
-    readlinestate *mod_state;
+    readlinestate *state = get_readline_state(module);
 
     if (strncmp(rl_library_version, libedit_version_tag, strlen(libedit_version_tag)) == 0) {
-        using_libedit_emulation = 1;
+        state->using_libedit_emulation = 1;
     }
 
-    if (using_libedit_emulation)
+    if (state->using_libedit_emulation)
         readlinemodule.m_doc = doc_module_le;
 
     if (PyModule_AddIntConstant(module, "_READLINE_VERSION",
@@ -1475,8 +1476,7 @@ readline_exec(PyObject *module)
         return -1;
     }
 
-    mod_state = (readlinestate *) PyModule_GetState(module);
-    if (setup_readline(mod_state) < 0) {
+    if (setup_readline(state) < 0) {
         PyErr_NoMemory();
         return -1;
     }
