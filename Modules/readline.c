@@ -1449,12 +1449,20 @@ PyDoc_STRVAR(doc_module,
 PyDoc_STRVAR(doc_module_le,
 "Importing this module enables command line editing using libedit readline.");
 
+static int readline_exec(PyObject *module);
+
+static struct PyModuleDef_Slot readline_slots[] = {
+    {Py_mod_exec, readline_exec},
+    {0, NULL}
+};
+
 static struct PyModuleDef readlinemodule = {
     .m_base = PyModuleDef_HEAD_INIT,
     .m_name = "readline",
     .m_doc = doc_module,
     .m_size = sizeof(readlinestate),
     .m_methods = readline_methods,
+    .m_slots = readline_slots,
     .m_traverse = readline_traverse,
     .m_clear = readline_clear,
     .m_free = readline_free,
@@ -1464,7 +1472,13 @@ static struct PyModuleDef readlinemodule = {
 PyMODINIT_FUNC
 PyInit_readline(void)
 {
-    PyObject *m;
+    PyOS_ReadlineFunctionPointer = call_readline;
+    return PyModuleDef_Init(&readlinemodule);
+}
+
+static int
+readline_exec(PyObject *module)
+{
     readlinestate *mod_state;
 
     if (strncmp(rl_library_version, libedit_version_tag, strlen(libedit_version_tag)) == 0) {
@@ -1474,36 +1488,25 @@ PyInit_readline(void)
     if (using_libedit_emulation)
         readlinemodule.m_doc = doc_module_le;
 
-
-    m = PyModule_Create(&readlinemodule);
-
-    if (m == NULL)
-        return NULL;
-
-    if (PyModule_AddIntConstant(m, "_READLINE_VERSION",
+    if (PyModule_AddIntConstant(module, "_READLINE_VERSION",
                                 RL_READLINE_VERSION) < 0) {
-        goto error;
+        return -1;
     }
-    if (PyModule_AddIntConstant(m, "_READLINE_RUNTIME_VERSION",
+    if (PyModule_AddIntConstant(module, "_READLINE_RUNTIME_VERSION",
                                 rl_readline_version) < 0) {
-        goto error;
+        return -1;
     }
-    if (PyModule_AddStringConstant(m, "_READLINE_LIBRARY_VERSION",
+    if (PyModule_AddStringConstant(module, "_READLINE_LIBRARY_VERSION",
                                    rl_library_version) < 0)
     {
-        goto error;
+        return -1;
     }
 
-    mod_state = (readlinestate *) PyModule_GetState(m);
-    PyOS_ReadlineFunctionPointer = call_readline;
+    mod_state = (readlinestate *) PyModule_GetState(module);
     if (setup_readline(mod_state) < 0) {
         PyErr_NoMemory();
-        goto error;
+        return -1;
     }
 
-    return m;
-
-error:
-    Py_DECREF(m);
-    return NULL;
+    return 0;
 }
