@@ -70,7 +70,6 @@ static int using_libedit_emulation = 0;
 static const char libedit_version_tag[] = "EditLine wrapper";
 
 static int8_t libedit_history_start = 0;
-static int8_t libedit_append_replace_history_offset = 0;
 
 #ifdef HAVE_RL_COMPLETION_DISPLAY_MATCHES_HOOK
 static void
@@ -91,6 +90,7 @@ typedef struct {
   PyObject *completer; /* Specify a word completer in Python */
   PyObject *begidx;
   PyObject *endidx;
+    int8_t libedit_append_replace_history_offset;
 } readlinestate;
 
 static inline readlinestate*
@@ -344,8 +344,9 @@ readline_append_history_file_impl(PyObject *module, int nelements,
         filename_bytes = NULL;
         filename = NULL;
     }
+    readlinestate *state = get_readline_state(module);
     errno = err = append_history(
-        nelements - libedit_append_replace_history_offset, filename);
+        nelements - state->libedit_append_replace_history_offset, filename);
     if (!err && _history_length >= 0)
         history_truncate_file(filename, _history_length);
     Py_XDECREF(filename_bytes);
@@ -669,8 +670,9 @@ readline_replace_history_item_impl(PyObject *module, int entry_number,
     if (encoded == NULL) {
         return NULL;
     }
+    readlinestate *state = get_readline_state(module);
     old_entry = replace_history_entry(
-        entry_number + libedit_append_replace_history_offset,
+        entry_number + state->libedit_append_replace_history_offset,
         PyBytes_AS_STRING(encoded), (void *)NULL);
     Py_DECREF(encoded);
     if (!old_entry) {
@@ -1226,10 +1228,11 @@ setup_readline(readlinestate *mod_state)
         HIST_ENTRY *old_entry = replace_history_entry(1, "X", NULL);
         _py_free_history_entry(old_entry);
         HIST_ENTRY *item = history_get(libedit_history_start);
+        readlinestate *state = get_readline_state(module);
         if (item && item->line && strcmp(item->line, "X")) {
-            libedit_append_replace_history_offset = 0;
+            state->libedit_append_replace_history_offset = 0;
         } else {
-            libedit_append_replace_history_offset = 1;
+            state->libedit_append_replace_history_offset = 1;
         }
     }
     clear_history();
