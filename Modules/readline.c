@@ -1449,33 +1449,6 @@ PyDoc_STRVAR(doc_module,
 PyDoc_STRVAR(doc_module_le,
 "Importing this module enables command line editing using libedit readline.");
 
-static int readline_exec(PyObject *module);
-
-static struct PyModuleDef_Slot readline_slots[] = {
-    {Py_mod_exec, readline_exec},
-    {0, NULL}
-};
-
-static struct PyModuleDef readlinemodule = {
-    .m_base = PyModuleDef_HEAD_INIT,
-    .m_name = "readline",
-    .m_doc = doc_module,
-    .m_size = sizeof(readlinestate),
-    .m_methods = readline_methods,
-    .m_slots = readline_slots,
-    .m_traverse = readline_traverse,
-    .m_clear = readline_clear,
-    .m_free = readline_free,
-};
-
-
-PyMODINIT_FUNC
-PyInit_readline(void)
-{
-    PyOS_ReadlineFunctionPointer = call_readline;
-    return PyModuleDef_Init(&readlinemodule);
-}
-
 static int
 readline_exec(PyObject *module)
 {
@@ -1509,4 +1482,28 @@ readline_exec(PyObject *module)
     }
 
     return 0;
+}
+
+static struct PyModuleDef_Slot readline_slots[] = {
+    {Py_mod_exec, readline_exec},
+    {0, NULL}
+};
+
+static struct PyModuleDef readlinemodule = {
+    .m_base = PyModuleDef_HEAD_INIT,
+    .m_name = "readline",
+    .m_doc = doc_module,
+    .m_size = sizeof(readlinestate),
+    .m_methods = readline_methods,
+    .m_slots = readline_slots,
+    .m_traverse = readline_traverse,
+    .m_clear = readline_clear,
+    .m_free = readline_free,
+};
+
+PyMODINIT_FUNC
+PyInit_readline(void)
+{
+    PyOS_ReadlineFunctionPointer = call_readline;
+    return PyModuleDef_Init(&readlinemodule);
 }
