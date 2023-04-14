@@ -53,8 +53,6 @@ extern char **completion_matches(char *, CPFunction *);
 
 static const char libedit_version_tag[] = "EditLine wrapper";
 
-static int8_t libedit_history_start = 0;
-
 #ifdef HAVE_RL_COMPLETION_DISPLAY_MATCHES_HOOK
 static void
 on_completion_display_matches_hook(char **matches,
@@ -91,6 +89,7 @@ typedef struct {
      *   with both implementations.
      */
     int using_libedit_emulation;
+    int8_t libedit_history_start;
     int8_t libedit_append_replace_history_offset;
 } readlinestate;
 
@@ -832,15 +831,15 @@ readline_get_history_item_impl(PyObject *module, int idx)
          */
         int length = _py_get_history_length();
 
-        idx = idx - 1 + libedit_history_start;
+        idx = idx - 1 + state->libedit_history_start;
 
         /*
          * Apple's readline emulation crashes when
          * the index is out of range, therefore
          * test for that and fail gracefully.
          */
-        if (idx < (0 + libedit_history_start)
-                || idx >= (length + libedit_history_start)) {
+        if (idx < (0 + state->libedit_history_start)
+                || idx >= (length + state->libedit_history_start)) {
             Py_RETURN_NONE;
         }
     }
@@ -1218,9 +1217,9 @@ setup_readline(readlinestate *mod_state)
      */
     add_history("1");
     if (history_get(1) == NULL) {
-        libedit_history_start = 0;
+        state->libedit_history_start = 0;
     } else {
-        libedit_history_start = 1;
+        state->libedit_history_start = 1;
     }
     /* Some libedit implementations use 1 based indexing on
      * replace_history_entry where libreadline uses 0 based.
@@ -1231,7 +1230,7 @@ setup_readline(readlinestate *mod_state)
         add_history("2");
         HIST_ENTRY *old_entry = replace_history_entry(1, "X", NULL);
         _py_free_history_entry(old_entry);
-        HIST_ENTRY *item = history_get(libedit_history_start);
+        HIST_ENTRY *item = history_get(state->libedit_history_start);
         readlinestate *state = get_readline_state(module);
         if (item && item->line && strcmp(item->line, "X")) {
             state->libedit_append_replace_history_offset = 0;
@@ -1425,7 +1424,7 @@ call_readline(FILE *sys_stdin, FILE *sys_stdout, const char *prompt)
             readlinestate *state = get_readline_state(module);
             if (state->using_libedit_emulation) {
                 /* handle older 0-based or newer 1-based indexing */
-                hist_ent = history_get(length + libedit_history_start - 1);
+                hist_ent = history_get(length + state->libedit_history_start - 1);
             } else
                 hist_ent = history_get(length);
             line = hist_ent ? hist_ent->line : "";
