@@ -94,6 +94,10 @@ typedef struct {
 
     int history_length;
     int should_auto_add_history;
+
+#ifdef HAVE_RL_RESIZE_TERMINAL
+    volatile sig_atomic_t sigwinch_received;
+#endif
 } readlinestate;
 
 static inline readlinestate*
@@ -1090,13 +1094,12 @@ on_completion_display_matches_hook(char **matches,
 #endif
 
 #ifdef HAVE_RL_RESIZE_TERMINAL
-static volatile sig_atomic_t sigwinch_received;
 static PyOS_sighandler_t sigwinch_ohandler;
 
 static void
-readline_sigwinch_handler(int signum)
+readline_sigwinch_handler(readlinestate *state, int signum)
 {
-    sigwinch_received = 1;
+    state->sigwinch_received = 1;
     if (sigwinch_ohandler &&
             sigwinch_ohandler != SIG_IGN && sigwinch_ohandler != SIG_DFL)
         sigwinch_ohandler(signum);
@@ -1104,7 +1107,7 @@ readline_sigwinch_handler(int signum)
 #ifndef HAVE_SIGACTION
     /* If the handler was installed with signal() rather than sigaction(),
     we need to reinstall it. */
-    PyOS_setsig(SIGWINCH, readline_sigwinch_handler);
+    PyOS_setsig(SIGWINCH, readline_sigwinch_handler); <--- We stuck here; no way to pass the module state
 #endif
 }
 #endif
@@ -1313,7 +1316,8 @@ rlhandler(char *text)
 }
 
 static char *
-readline_until_enter_or_signal(const char *prompt, int *signal)
+readline_until_enter_or_signal(readlinestate *state, const char *prompt,
+                               int *signal)
 {
     char * not_done_reading = "";
     fd_set selectset;
@@ -1341,8 +1345,8 @@ readline_until_enter_or_signal(const char *prompt, int *signal)
                 timeoutp = &timeout;
 #ifdef HAVE_RL_RESIZE_TERMINAL
             /* Update readline's view of the window size after SIGWINCH */
-            if (sigwinch_received) {
-                sigwinch_received = 0;
+            if (state->sigwinch_received) {
+                state->sigwinch_received = 0;
                 rl_resize_terminal();
             }
 #endif
