@@ -93,6 +93,7 @@ typedef struct {
     char *completer_word_break_characters;
 
     int history_length;
+    int should_auto_add_history;
 } readlinestate;
 
 static inline readlinestate*
@@ -715,8 +716,6 @@ readline_add_history(PyObject *module, PyObject *string)
     Py_RETURN_NONE;
 }
 
-static int should_auto_add_history = 1;
-
 /* Enable or disable automatic history */
 
 /*[clinic input]
@@ -733,7 +732,8 @@ readline_set_auto_history_impl(PyObject *module,
                                int _should_auto_add_history)
 /*[clinic end generated code: output=619c6968246fd82b input=3d413073a1a03355]*/
 {
-    should_auto_add_history = _should_auto_add_history;
+    readlinestate *state = get_readline_state(module);
+    state->should_auto_add_history = _should_auto_add_history;
     Py_RETURN_NONE;
 }
 
@@ -1419,13 +1419,13 @@ call_readline(FILE *sys_stdin, FILE *sys_stdout, const char *prompt)
     }
 
     /* we have a valid line */
+    readlinestate *state = get_readline_state(module);
     n = strlen(p);
-    if (should_auto_add_history && n > 0) {
+    if (state->should_auto_add_history && n > 0) {
         const char *line;
         int length = _py_get_history_length();
         if (length > 0) {
             HIST_ENTRY *hist_ent;
-            readlinestate *state = get_readline_state(module);
             if (state->using_libedit_emulation) {
                 /* handle older 0-based or newer 1-based indexing */
                 hist_ent = history_get(length + state->libedit_history_start - 1);
@@ -1465,6 +1465,7 @@ readline_exec(PyObject *module)
 {
     readlinestate *state = get_readline_state(module);
     state->history_length = -1; /* do not truncate history by default */
+    state->should_auto_add_history = 1;
 
     if (strncmp(rl_library_version, libedit_version_tag, strlen(libedit_version_tag)) == 0) {
         state->using_libedit_emulation = 1;
