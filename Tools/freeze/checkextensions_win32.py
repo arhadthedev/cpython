@@ -67,13 +67,10 @@ def checkextensions(unknown, extra_inis, prefix):
     ret = []
     for mod in unknown:
         for ini in extra_inis:
-#                       print "Looking for", mod, "in", win32api.GetFullPathName(ini),"...",
             defn = get_extension_defn( mod, ini, prefix )
             if defn is not None:
-#                               print "Yay - found it!"
                 ret.append( defn )
                 break
-#                       print "Nope!"
         else: # For not broken!
             sys.stderr.write("No definition of module %s in any specified map file.\n" % (mod))
 
@@ -125,7 +122,6 @@ def get_extension_defn(moduleName, mapFileName, prefix):
 # Given an MSVC DSP file, locate C source files it uses
 # returns a list of source files.
 def parse_dsp(dsp):
-#       print "Processing", dsp
     # For now, only support
     ret = []
     dsp_path, dsp_name = os.path.split(dsp)
