@@ -287,7 +287,7 @@ class MiscTestCase(unittest.TestCase):
 
 class MimetypesCliTestCase(unittest.TestCase):
 
-    def mimetypes_cmd(cls, *args, **kwargs):
+    def mimetypes_cmd(cls, *args):
         result, _ = run_python_until_end('-m', 'mimetypes', *args)
         return result.rc, result.out.decode(), result.err.decode()
 
@@ -298,21 +298,40 @@ class MimetypesCliTestCase(unittest.TestCase):
         self.assertEqual(err, '')
 
     def test_invalid_option(self):
-        retcode, out, err = self.mimetypes_cmd('--invalid')
+        for options in (('--invalid',), ('--invalid', '--nofail')):
+            with self.subTest(options=options):
+                retcode, out, err = self.mimetypes_cmd(*options)
+                self.assertEqual(retcode, 2)
+                self.assertEqual(out, '')
+                self.assertIn('usage: mimetypes.py', err)
+
+        retcode, out, err = self.mimetypes_cmd('--invalid', '--nofail')
         self.assertEqual(retcode, 2)
         self.assertEqual(out, '')
         self.assertIn('usage: mimetypes.py', err)
 
     def test_guess_extension(self):
-        retcode, out, err = self.mimetypes_cmd('-l', '-e', 'image/jpg')
-        self.assertEqual(retcode, 0)
-        self.assertEqual(out, f'.jpg{linesep}')
-        self.assertEqual(err, '')
+        basic_options = ('-l', '-e', 'image/jpg')
+        for extra_options in ((,), ('--nofail',)):
+            with self.subTest(options=options):
+                options = basic_options + extra_options
+                retcode, out, err = self.mimetypes_cmd(*options)
+                self.assertEqual(retcode, 0)
+                self.assertEqual(out, f'.jpg{linesep}')
+                self.assertEqual(err, '')
 
         retcode, out, err = self.mimetypes_cmd('-e', 'image/jpg')
         self.assertEqual(retcode, 1)
         self.assertEqual(out, '')
         self.assertEqual(err, f'error: unknown type image/jpg{linesep}')
+
+        retcode, out, err = self.mimetypes_cmd('-e', 'image/jpg', '-n')
+        self.assertEqual(retcode, 0)
+        self.assertEqual(out, f'error: unknown type image/jpg{linesep}')
+        self.assertEqual(err, '')
+
+        протестировать обработку несколькив вводов в различных комбинациях
+        (генерировать выходные строки для входных и сравнивать)
 
         retcode, out, err = self.mimetypes_cmd('-e', 'image/jpeg')
         self.assertEqual(retcode, 0)

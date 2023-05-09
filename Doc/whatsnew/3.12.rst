@@ -296,6 +296,16 @@ os
   (Contributed by Charles Machalow in :gh:`99547`.)
 
 
+mimetypes
+---------
+
+* Command-line interface exit code was changed for unknown MIME types
+  and file extensions. Previously if was ``0``
+
+now  ``1`` for unknows MIME types and 
+
+(Contributed by Oleg Iarygin in :gh:`93096`.)
+
 shutil
 ------
 
