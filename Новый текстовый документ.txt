@@ -1,0 +1,3 @@
+Both ``IPv6Address`` and ``IPv6Network`` can be converted to ``IPv4Address`` and ``IPv4Network`` if they have . That's why the author moved ``ipv4_mapped`` attribute into the ``_IPAddressBase`` root class.
+
+However, it imposes IPv6-specific knowledge onto each and every transport protocol that can be added into ``ipaddress`` package in the future. 
