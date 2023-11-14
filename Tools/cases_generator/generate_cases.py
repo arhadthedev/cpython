@@ -422,7 +422,15 @@ class Generator(Analyzer):
             self.write_pseudo_instrs()
 
             self.out.emit("")
-            self.write_uop_items(lambda name, counter: f"#define {name} {counter}")
+            self.out.emit("enum _Py_OPCODES {")
+            next_uop_id = 0
+            def define_uop(name, uop_id):
+                nonlocal next_uop_id
+                value = "" if uop_id == next_uop_id else f" = {uop_id}"
+                next_uop_id = uop_id + 1
+                return f"    {name}{value},"
+            self.write_uop_items(define_uop)
+            self.out.emit("};")
 
             self.write_stack_effect_functions()
 
