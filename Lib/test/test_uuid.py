@@ -225,6 +225,38 @@ class BaseTestUUID:
         resorted.sort()
         equal(ascending, resorted)
 
+    def test_versions(self):
+        # RFC 4122 template (otherwise, `version` property returns None)
+        template =[0x00010203, 0x0405, 0x0607, 0xa8, 9, 0x0a0b0c0d0e0f]
+        check_table = (
+            (0, None),
+            (1, 1),
+            (2, 2),
+            (3, 3),
+            (4, 4),
+            (5, 5),
+            (6, None),
+            (7, None),
+            (8, None),
+            (9, None),
+            (10, None),
+            (11, None),
+            (12, None),
+            (13, None),
+            (14, None),
+            (15, None),
+        )
+        for version, expected in check_table:
+            with self.subTest(version=version):
+                template[2] &= 0x0fff
+                template[2] |= version << (3 * 4)
+                value = tuple(template)
+                print(self.uuid.UUID(fields=value).variant)
+                print(self.uuid.UUID(fields=value).version)
+                self.assertEqual(self.uuid.UUID(fields=value).version, expected)
+                #with self.assertRaisesRegex(ValueError, 'illegal version'):
+                self.uuid.UUID(fields=value, version=version)
+
     def test_exceptions(self):
         badvalue = lambda f: self.assertRaises(ValueError, f)
         badtype = lambda f: self.assertRaises(TypeError, f)
